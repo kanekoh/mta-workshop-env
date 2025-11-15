@@ -1,0 +1,41 @@
+# Environment files
+env.sh
+.env
+*.tfvars
+!*.tfvars.example
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.rc
+.terraformrc
+
+# Ansible
+ansible/cluster_info.json
+ansible/*.retry
+ansible/.vault_pass
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# Logs
+*.log
+

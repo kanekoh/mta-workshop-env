@@ -1,0 +1,124 @@
+# Cluster Configuration
+# Note: 主要な設定は環境変数から読み込まれます
+# export TF_VAR_aws_region="ap-northeast-1"
+# export TF_VAR_cluster_name="mta-lightspeed"
+# export TF_VAR_ocp_version="4.19"
+# export TF_VAR_billing_account="YOUR_BILLING_ACCOUNT_ID"
+
+# Network outputs from network module (must be set after network deployment)
+# These values should be obtained from terraform/network outputs
+vpc_id              = "vpc-xxxxxxxxx"  # From network module output
+public_subnet_ids   = ["subnet-xxxxx", "subnet-yyyyy"]  # From network module output
+private_subnet_ids  = ["subnet-zzzzz", "subnet-wwwww"]  # From network module output
+availability_zones  = ["ap-northeast-1a"]  # From network module output
+
+aws_region          = "ap-northeast-1"
+cluster_name        = "mta-lightspeed"
+vpc_cidr            = "10.0.0.0/16"
+ocp_version         = "4.19"
+rosa_machine_type   = "m6a.2xlarge"
+rosa_replicas       = 2
+availability_zone_count = 1
+
+# Admin User
+create_admin_user = true
+
+# IDP Passwords (optional)
+# admin_password     = "your-admin-password"
+# developer_password = "your-developer-password"
+
+# Additional MachinePools (optional)
+# The first MachinePool is automatically created by module.rosa_hcp and cannot be deleted.
+# These are additional MachinePools (2nd pool and beyond) for specific workloads.
+#
+# Example: GPU pool for OpenShift AI / LLM serving
+# additional_machine_pools = [
+#   {
+#     name          = "gpu-pool"
+#     instance_type = "g6e.12xlarge"  # GPU instance type
+#     replicas      = 1
+#     auto_repair   = true  # Enable auto repair (default: true, optional)
+#     subnet_id      = null  # Subnet ID (optional). If null, uses first private subnet.
+#                            # For Single-AZ: specify a subnet_id in the desired AZ.
+#                            # For Multi-AZ: specify subnet_id for each AZ, or create separate machine pools per AZ.
+#     autoscaling = {
+#       enabled      = false  # Enable autoscaling (default: false, optional)
+#       min_replicas = 1      # Minimum replicas (required if enabled = true)
+#       max_replicas = 3      # Maximum replicas (required if enabled = true)
+#     }
+#     labels = {
+#       "node-role.kubernetes.io/gpu" = ""
+#       "workload-type"               = "ai"
+#     }
+#     taints = [
+#       {
+#         key    = "nvidia.com/gpu"
+#         value  = "true"
+#         effect = "NoSchedule"
+#       }
+#     ]
+#     # Note: subnet_ids is not configurable - uses cluster's default subnets automatically
+#   },
+#   {
+#     name          = "ai-pool"
+#     instance_type = "m6a.4xlarge"  # High memory instance
+#     replicas      = 3
+#     auto_repair   = true  # Enable auto repair (default: true, optional)
+#     subnet_id      = null  # Subnet ID (optional). If null, uses first private subnet.
+#                            # For Multi-AZ: create separate machine pools for each AZ, e.g.:
+#                            # - ai-pool-az1 with subnet_id = private_subnet_ids[0]
+#                            # - ai-pool-az2 with subnet_id = private_subnet_ids[1]
+#                            # - ai-pool-az3 with subnet_id = private_subnet_ids[2]
+#     autoscaling = {
+#       enabled      = false  # Enable autoscaling (default: false, optional)
+#       min_replicas = 2      # Minimum replicas (required if enabled = true)
+#       max_replicas = 5      # Maximum replicas (required if enabled = true)
+#     }
+#     labels = {
+#       "workload-type" = "ai"
+#     }
+#     taints = []
+#     # Note: subnet_ids is not configurable - uses cluster's default subnets automatically
+#   }
+# ]
+#
+# Example: Multi-AZ MachinePool (create separate machine pools for each AZ)
+# additional_machine_pools = [
+#   {
+#     name          = "gpu-pool-az1"
+#     instance_type = "g6e.12xlarge"
+#     replicas      = 1
+#     subnet_id      = "subnet-xxxxx"  # Private subnet in AZ1 (from private_subnet_ids[0])
+#     labels = {
+#       "node-role.kubernetes.io/gpu" = ""
+#       "availability-zone"            = "az1"
+#     }
+#     taints = []
+#   },
+#   {
+#     name          = "gpu-pool-az2"
+#     instance_type = "g6e.12xlarge"
+#     replicas      = 1
+#     subnet_id      = "subnet-yyyyy"  # Private subnet in AZ2 (from private_subnet_ids[1])
+#     labels = {
+#       "node-role.kubernetes.io/gpu" = ""
+#       "availability-zone"            = "az2"
+#     }
+#     taints = []
+#   },
+#   {
+#     name          = "gpu-pool-az3"
+#     instance_type = "g6e.12xlarge"
+#     replicas      = 1
+#     subnet_id      = "subnet-zzzzz"  # Private subnet in AZ3 (from private_subnet_ids[2])
+#     labels = {
+#       "node-role.kubernetes.io/gpu" = ""
+#       "availability-zone"            = "az3"
+#     }
+#     taints = []
+#   }
+# ]
+#
+# To disable additional MachinePools, leave this unset or set to empty list:
+# additional_machine_pools = []
+

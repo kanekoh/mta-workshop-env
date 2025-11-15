@@ -1,0 +1,19 @@
+# Network Configuration
+# Note: 主要な設定は環境変数から読み込まれます
+# export TF_VAR_aws_region="ap-northeast-1"
+# export TF_VAR_cluster_name="mta-lightspeed"
+# export TF_VAR_vpc_cidr="10.0.0.0/16"
+# export TF_VAR_availability_zone_count="1"
+
+aws_region              = "ap-northeast-1"
+cluster_name            = "mta-lightspeed"
+vpc_cidr                = "10.0.0.0/16"
+availability_zone_count = 1
+
+# Tags
+tags = {
+  Environment = "Workshop"
+  Project     = "MTA-for-Developer-Lightspeed"
+  Owner       = "Your Name"
+}
+
