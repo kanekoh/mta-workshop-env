@@ -9,7 +9,8 @@
 # 3. トークン切れを考慮した再認証機能
 ###############################################################################
 
-set -e  # エラーが発生したら即座に終了
+# set -e をコメントアウト（エラーを無視して続行するため）
+# set -e  # エラーが発生したら即座に終了
 
 # カラー出力の設定
 RED='\033[0;31m'
@@ -123,6 +124,34 @@ ensure_rosa_auth() {
 
     log_info "Terraform 用の RHCS 認証は環境変数から行われます。"
     log_info "推奨: サービスアカウントの RHCS_CLIENT_ID / RHCS_CLIENT_SECRET を env.sh に設定してください。"
+    
+    # RHCS_TOKENの取得（MachinePoolやIdentity Providerの削除時に必要になる場合があるため）
+    log_info "RHCS_TOKENの確認中..."
+    if [ -z "$RHCS_TOKEN" ]; then
+        log_warning "RHCS_TOKENが設定されていません"
+        log_info "MachinePoolやIdentity Providerの削除時にRHCS_TOKENが必要な場合があります"
+        
+        # rosa loginが完了しているか確認
+        if rosa whoami > /dev/null 2>&1; then
+            log_info "ROSAにログイン済みです。RHCS_TOKENを取得中..."
+            if RHCS_TOKEN=$(rosa token 2>/dev/null); then
+                export RHCS_TOKEN
+                log_success "RHCS_TOKENを取得しました"
+            else
+                log_warning "RHCS_TOKENの取得に失敗しました"
+                log_info "手動で取得する場合は以下を実行してください："
+                echo "  rosa login --use-auth-code  # または --use-device-code"
+                echo "  export RHCS_TOKEN=\$(rosa token)"
+            fi
+        else
+            log_warning "ROSAにログインしていません"
+            log_info "RHCS_TOKENを取得するには、まずROSAにログインしてください："
+            echo "  rosa login --use-auth-code  # または --use-device-code"
+            echo "  export RHCS_TOKEN=\$(rosa token)"
+        fi
+    else
+        log_info "RHCS_TOKENが既に設定されています"
+    fi
 }
 
 # クラスター名の取得
@@ -155,6 +184,52 @@ get_cluster_name() {
     echo "$cluster_name"
 }
 
+# MachinePoolとIdentity Providerを先に削除（403エラーを回避）
+cleanup_cluster_resources() {
+    local cluster_name="$1"
+    
+    if [ -z "$cluster_name" ]; then
+        log_warning "クラスター名が指定されていません。スキップします"
+        return 0
+    fi
+    
+    log_info "クラスター名: ${cluster_name}"
+    
+    # MachinePoolを削除（403エラーが発生する可能性があるため、ROSA CLIで削除を試みる）
+    log_info "追加のMachinePoolを削除中..."
+    MACHINE_POOLS=$(rosa list machinepools -c "${cluster_name}" --output json 2>/dev/null | jq -r '.[] | select(.id != "workers") | .id' 2>/dev/null || echo "")
+    
+    if [ -n "$MACHINE_POOLS" ]; then
+        for pool in $MACHINE_POOLS; do
+            log_info "MachinePool '${pool}' を削除中..."
+            if rosa delete machinepool -c "${cluster_name}" --machinepool "${pool}" --yes 2>&1; then
+                log_success "MachinePool '${pool}' を削除しました"
+            else
+                log_warning "MachinePool '${pool}' の削除に失敗しました（既に削除済みの可能性があります）"
+            fi
+        done
+    else
+        log_info "削除対象のMachinePoolはありません"
+    fi
+    
+    # Identity Providerを削除（403エラーが発生する可能性があるため、ROSA CLIで削除を試みる）
+    log_info "Identity Providerを削除中..."
+    IDPS=$(rosa list idp -c "${cluster_name}" --output json 2>/dev/null | jq -r '.[] | .id' 2>/dev/null || echo "")
+    
+    if [ -n "$IDPS" ]; then
+        for idp in $IDPS; do
+            log_info "Identity Provider '${idp}' を削除中..."
+            if rosa delete idp -c "${cluster_name}" --idp "${idp}" --yes 2>&1; then
+                log_success "Identity Provider '${idp}' を削除しました"
+            else
+                log_warning "Identity Provider '${idp}' の削除に失敗しました（既に削除済みの可能性があります）"
+            fi
+        done
+    else
+        log_info "削除対象のIdentity Providerはありません"
+    fi
+}
+
 # フェーズ1: ROSAクラスターの削除
 destroy_cluster() {
     log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -175,15 +250,50 @@ destroy_cluster() {
     CLUSTER_NAME=$(get_cluster_name)
     log_info "クラスター名: ${CLUSTER_NAME}"
     
+    # MachinePoolとIdentity Providerを先に削除（403エラーを回避）
+    cd ../..
+    cleanup_cluster_resources "${CLUSTER_NAME}"
+    cd terraform/cluster
+    
     # Terraform destroy実行（エラーは無視して後続処理を継続）
     log_info "Terraform destroyを実行中..."
-    if terraform destroy -auto-approve; then
-        log_success "Terraform destroyリクエストが送信されました！"
+    # set +e でエラーを無視
+    set +e
+    terraform destroy -auto-approve 2>&1 | tee /tmp/terraform_destroy_cluster.log
+    DESTROY_EXIT_CODE=$?
+    set -e
+    
+    # クラスターリソースの削除が試みられたか確認
+    if grep -q "rhcs_cluster_rosa_hcp.rosa_hcp_cluster.*Destroying\|rhcs_cluster_rosa_hcp.rosa_hcp_cluster.*destroyed" /tmp/terraform_destroy_cluster.log 2>/dev/null; then
+        log_success "Terraform destroyでクラスター削除リクエストが送信されました！"
         log_info "注意: Terraformは削除リクエストを送信して即座に完了します"
+    elif [ $DESTROY_EXIT_CODE -eq 0 ]; then
+        log_success "Terraform destroyが完了しました"
     else
-        log_warning "Terraform destroyでエラーが発生しましたが、ROSAクラスター削除状態の確認を続行します"
-        log_warning "（クラスターが既に削除中／削除済みの場合にもこのエラーが発生することがあります）"
+        log_warning "Terraform destroyでエラーが発生しました（Exit Code: ${DESTROY_EXIT_CODE}）"
+        log_warning "MachinePoolやIdentity Providerの削除エラーが原因の可能性があります"
+        log_info "クラスターの削除状態を確認します..."
+        
+        # クラスターが削除中か確認
+        sleep 5
+        if rosa describe cluster -c "${CLUSTER_NAME}" > /dev/null 2>&1; then
+            CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_NAME}" --output json 2>/dev/null | jq -r '.state' 2>/dev/null || echo "unknown")
+            if [ "$CLUSTER_STATE" != "ready" ]; then
+                log_info "クラスターは '${CLUSTER_STATE}' 状態です。削除が進行中の可能性があります"
+            else
+                log_warning "クラスターはまだ 'ready' 状態です。手動で削除を試みます..."
+                # rosa delete cluster を試みる
+                if rosa delete cluster -c "${CLUSTER_NAME}" --yes 2>&1; then
+                    log_success "ROSA CLIでクラスター削除リクエストを送信しました"
+                else
+                    log_error "ROSA CLIでのクラスター削除にも失敗しました"
+                fi
+            fi
+        else
+            log_info "クラスターは既に存在しません"
+        fi
     fi
+    
     log_info "次のステップで rosa コマンドでクラスター削除の完了を確認します"
     echo ""
     

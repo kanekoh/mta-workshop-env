@@ -325,6 +325,30 @@ terraform destroy
 **回避策**:
 - `destroy.sh` スクリプトを使用することで、自動的に適切な順序で削除が実行されます。
 
+### 3. MachinePool作成時の権限エラー（403 Forbidden）
+
+**問題**: TerraformでMachinePoolを作成する際、サービスアカウント（`RHCS_CLIENT_ID` / `RHCS_CLIENT_SECRET`）を使用している場合、403 Forbiddenエラーが発生することがあります。これは、サービスアカウントにMachinePool作成に必要な権限が不足している可能性があります。
+
+**対処方法**:
+- 一時的に `RHCS_TOKEN` を使用することで回避できます：
+  ```bash
+  # ROSAにログイン
+  rosa login --use-auth-code  # または --use-device-code
+  
+  # トークンを取得
+  export RHCS_TOKEN=$(rosa token)
+  
+  # Terraformを実行
+  cd terraform/cluster
+  terraform apply
+  ```
+- `deploy.sh` スクリプトを使用している場合、`additional_machine_pools` が定義されていると自動的に `RHCS_TOKEN` の取得を試みます。
+
+**注意**:
+- この問題は、サービスアカウントの権限設定に関する可能性があります。
+- Red Hatサポートまたは社内のROSA担当者に確認して、サービスアカウントに適切な権限を付与する必要があるかもしれません。
+- 現時点では、`RHCS_TOKEN` を使用することで回避できますが、長期的にはサービスアカウントの権限を適切に設定することが推奨されます。
+
 ## トラブルシューティング
 
 ### ROSA クォータエラー

@@ -10,6 +10,7 @@ env.sh
 *.tfstate
 *.tfstate.*
 *.tfplan
+tfplan
 terraform.rc
 .terraformrc
 
