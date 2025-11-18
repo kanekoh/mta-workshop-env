@@ -1,0 +1,4 @@
+---
+# Variables for OpenShift GitOps role
+# These can be overridden in group_vars or playbook vars
+

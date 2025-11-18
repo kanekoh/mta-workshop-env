@@ -53,24 +53,10 @@ rosa login --use-device-code
 
 Terraform (RHCS provider) 向けの認証方法:
 
-**方法1: サービスアカウント（推奨、ただし一部操作で権限不足の可能性あり）**
 ```bash
 export RHCS_CLIENT_ID="YOUR_RHCS_CLIENT_ID"
 export RHCS_CLIENT_SECRET="YOUR_RHCS_CLIENT_SECRET"
 ```
-
-**方法2: 一時トークン（MachinePool作成時など、一部操作で必要）**
-```bash
-# まず rosa login を実行
-rosa login --use-auth-code  # または --use-device-code
-
-# その後、トークンを取得
-export RHCS_TOKEN=$(rosa token)
-```
-
-**注意**: MachinePool作成時など、一部の操作ではサービスアカウントでは
-403エラーが発生する場合があります。その場合はRHCS_TOKENを使用してください。
-RHCS_TOKENは一時トークンで有効期限が短いため、長時間の操作には注意が必要です。
 
 ### ステップ 4: Terraform設定
 
@@ -203,7 +189,7 @@ terraform destroy
 ## 📚 次のステップ
 
 1. [README.md](README.md) - 詳細なドキュメント
-2. [ansible/README.md](ansible/README.md) - Ansible設定（準備中）
+2. [ansible/README.md](ansible/README.md) - Ansible設定
 3. ROSA公式ドキュメント - https://docs.openshift.com/rosa/
 
 ## 💡 ヒント

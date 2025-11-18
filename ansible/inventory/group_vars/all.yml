@@ -1,0 +1,16 @@
+# OpenShift Cluster Information
+# This file is populated from terraform/cluster outputs
+# The cluster_info.json file contains the cluster details
+
+# OpenShift GitOps Operator Configuration
+openshift_gitops:
+  # Operator subscription settings
+  operator_namespace: openshift-gitops-operator
+  operator_name: openshift-gitops-operator
+  operator_channel: latest
+  operator_source: redhat-operators
+  
+  # ArgoCD instance settings (for reference)
+  argocd_namespace: openshift-gitops
+  argocd_instance_name: openshift-gitops
+

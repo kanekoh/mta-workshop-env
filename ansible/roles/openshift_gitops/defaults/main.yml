@@ -1,0 +1,10 @@
+---
+# Default variables for OpenShift GitOps role
+openshift_gitops_operator_namespace: openshift-gitops-operator
+openshift_gitops_operator_name: openshift-gitops-operator
+openshift_gitops_operator_channel: latest
+openshift_gitops_operator_source: redhat-operators
+
+argocd_namespace: openshift-gitops
+argocd_instance_name: openshift-gitops
+

@@ -54,7 +54,21 @@ variable "billing_account" {
 variable "create_admin_user" {
   description = "Whether to create an admin user for the cluster"
   type        = bool
-  default     = false
+  default     = true
+}
+
+variable "cluster_admin_username" {
+  description = "Username for the cluster admin user. If not specified, module default will be used."
+  type        = string
+  default     = null
+  sensitive   = false
+}
+
+variable "cluster_admin_password" {
+  description = "Password for the cluster admin user. If not specified, module will generate a random password."
+  type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "admin_password" {

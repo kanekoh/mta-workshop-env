@@ -1,0 +1,8 @@
+---
+# Main tasks file for OpenShift GitOps role
+- name: Install OpenShift GitOps Operator
+  include_tasks: install_operator.yml
+
+- name: Wait for Operator to be ready
+  include_tasks: wait_operator.yml
+

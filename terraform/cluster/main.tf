@@ -4,7 +4,7 @@ data "aws_caller_identity" "current" {}
 # ROSA HCP モジュール
 module "rosa_hcp" {
   source  = "terraform-redhat/rosa-hcp/rhcs"
-  version = ">= 1.6.0"
+  version = "~> 1.7"
 
   # --- 必須パラメータ ---
   cluster_name      = var.cluster_name
@@ -22,11 +22,6 @@ module "rosa_hcp" {
   compute_machine_type = var.rosa_machine_type
 
   # --- STS / IAM / OIDC 周り ---
-  # 既存のアカウントロール / オペレーターロールを再利用するため、
-  # create_*_roles は false に設定し、prefix だけを指定します。
-  # すでに rosa CLI や過去の Terraform で作成済みのロールが
-  # "${var.cluster_name}-account-..." / "${var.cluster_name}-operator-roles-..."
-  # という名前で存在している前提です。
   create_account_roles  = true
   account_role_prefix   = "${var.cluster_name}-account"
 
@@ -43,8 +38,11 @@ module "rosa_hcp" {
     rosa_creator_arn = data.aws_caller_identity.current.arn
   }
 
-  # --- Admin ユーザ作成 (モジュール側のデフォルト cluster-admin は無効化) ---
-  create_admin_user = false
+  # --- Admin ユーザ作成 ---
+  create_admin_user = var.create_admin_user
+  
+  cluster_admin_username = var.cluster_admin_username
+  cluster_admin_password = var.cluster_admin_password
 
   # クラスター作成の待機を無効化（IDP作成を並行して実行するため）
   wait_for_create_complete            = false
@@ -68,7 +66,6 @@ resource "rhcs_identity_provider" "workshop_htpasswd" {
         for username in local.admin_usernames : {
           username = username
           password = var.admin_password
-          groups   = ["cluster-admins"]
         }
       ],
       [

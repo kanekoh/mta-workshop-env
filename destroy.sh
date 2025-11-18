@@ -6,8 +6,11 @@
 # このスクリプトは以下を実行します：
 # 1. Terraformを使用してROSA HCPクラスターを削除
 # 2. rosaコマンドでクラスター削除の完了を確認
-# 3. トークン切れを考慮した再認証機能
 ###############################################################################
+
+# スクリプトのディレクトリを取得（プロジェクトルートに移動）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # set -e をコメントアウト（エラーを無視して続行するため）
 # set -e  # エラーが発生したら即座に終了
@@ -124,34 +127,6 @@ ensure_rosa_auth() {
 
     log_info "Terraform 用の RHCS 認証は環境変数から行われます。"
     log_info "推奨: サービスアカウントの RHCS_CLIENT_ID / RHCS_CLIENT_SECRET を env.sh に設定してください。"
-    
-    # RHCS_TOKENの取得（MachinePoolやIdentity Providerの削除時に必要になる場合があるため）
-    log_info "RHCS_TOKENの確認中..."
-    if [ -z "$RHCS_TOKEN" ]; then
-        log_warning "RHCS_TOKENが設定されていません"
-        log_info "MachinePoolやIdentity Providerの削除時にRHCS_TOKENが必要な場合があります"
-        
-        # rosa loginが完了しているか確認
-        if rosa whoami > /dev/null 2>&1; then
-            log_info "ROSAにログイン済みです。RHCS_TOKENを取得中..."
-            if RHCS_TOKEN=$(rosa token 2>/dev/null); then
-                export RHCS_TOKEN
-                log_success "RHCS_TOKENを取得しました"
-            else
-                log_warning "RHCS_TOKENの取得に失敗しました"
-                log_info "手動で取得する場合は以下を実行してください："
-                echo "  rosa login --use-auth-code  # または --use-device-code"
-                echo "  export RHCS_TOKEN=\$(rosa token)"
-            fi
-        else
-            log_warning "ROSAにログインしていません"
-            log_info "RHCS_TOKENを取得するには、まずROSAにログインしてください："
-            echo "  rosa login --use-auth-code  # または --use-device-code"
-            echo "  export RHCS_TOKEN=\$(rosa token)"
-        fi
-    else
-        log_info "RHCS_TOKENが既に設定されています"
-    fi
 }
 
 # クラスター名の取得
@@ -184,7 +159,9 @@ get_cluster_name() {
     echo "$cluster_name"
 }
 
-# MachinePoolとIdentity Providerを先に削除（403エラーを回避）
+# MachinePoolとIdentity Providerを手動削除（Terraformで管理されていないリソース用）
+# 注意: Terraformで管理されているリソース（rhcs_hcp_machine_pool、rhcs_identity_provider）は
+# terraform destroyで削除されるため、この関数は通常は使用されません。
 cleanup_cluster_resources() {
     local cluster_name="$1"
     
@@ -250,10 +227,8 @@ destroy_cluster() {
     CLUSTER_NAME=$(get_cluster_name)
     log_info "クラスター名: ${CLUSTER_NAME}"
     
-    # MachinePoolとIdentity Providerを先に削除（403エラーを回避）
-    cd ../..
-    cleanup_cluster_resources "${CLUSTER_NAME}"
-    cd terraform/cluster
+    # MachinePoolとIdentity ProviderはTerraformで管理されているため、
+    # terraform destroyで削除される（事前削除は不要）
     
     # Terraform destroy実行（エラーは無視して後続処理を継続）
     log_info "Terraform destroyを実行中..."
@@ -263,6 +238,16 @@ destroy_cluster() {
     DESTROY_EXIT_CODE=$?
     set -e
     
+    # 403エラーを検出
+    if grep -q "403\|Forbidden" /tmp/terraform_destroy_cluster.log 2>/dev/null; then
+        log_error "Terraform destroyで権限エラー（403 Forbidden）が発生しました"
+        log_error "クラスター '${CLUSTER_NAME}' の削除権限がありません"
+        log_info "対処方法:"
+        echo "  1. クラスター作成時に使用したアカウント（RHCS_CLIENT_ID/CLIENT_SECRET）で認証しているか確認"
+        echo "  2. Hybrid Cloud Consoleでクラスターの所有者権限があるか確認"
+        echo "  3. クラスター作成者に削除を依頼するか、適切な権限を付与してもらう"
+    fi
+    
     # クラスターリソースの削除が試みられたか確認
     if grep -q "rhcs_cluster_rosa_hcp.rosa_hcp_cluster.*Destroying\|rhcs_cluster_rosa_hcp.rosa_hcp_cluster.*destroyed" /tmp/terraform_destroy_cluster.log 2>/dev/null; then
         log_success "Terraform destroyでクラスター削除リクエストが送信されました！"
@@ -271,7 +256,6 @@ destroy_cluster() {
         log_success "Terraform destroyが完了しました"
     else
         log_warning "Terraform destroyでエラーが発生しました（Exit Code: ${DESTROY_EXIT_CODE}）"
-        log_warning "MachinePoolやIdentity Providerの削除エラーが原因の可能性があります"
         log_info "クラスターの削除状態を確認します..."
         
         # クラスターが削除中か確認

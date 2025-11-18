@@ -1,0 +1,36 @@
+---
+# ArgoCD Application template
+# This template is used for creating ArgoCD Applications
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ application_name }}
+  namespace: {{ argocd_namespace }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ project_name | default('default') }}
+  source:
+    repoURL: {{ repo_url }}
+    targetRevision: {{ target_revision | default('HEAD') }}
+    path: {{ path | default('.') }}
+{% if directory is defined %}
+    directory:
+      recurse: {{ directory.recurse | default(true) }}
+{% endif %}
+{% if helm is defined %}
+    helm:
+      valueFiles: {{ helm.valueFiles | default(['values.yaml']) }}
+{% endif %}
+  destination:
+    server: {{ destination_server | default('https://kubernetes.default.svc') }}
+    namespace: {{ destination_namespace | default('default') }}
+  syncPolicy:
+    automated:
+      prune: {{ automated_prune | default(true) }}
+      selfHeal: {{ automated_self_heal | default(true) }}
+    syncOptions:
+      - CreateNamespace={{ create_namespace | default(true) }}
+      - PrunePropagationPolicy={{ prune_policy | default('foreground') }}
+      - PruneLast={{ prune_last | default(true) }}
+

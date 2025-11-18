@@ -23,6 +23,10 @@ availability_zone_count = 1
 # Admin User
 create_admin_user = true
 
+# Cluster Admin User (optional - if not specified, module defaults will be used)
+# cluster_admin_username = "cluster-admin"
+# cluster_admin_password = "your-cluster-admin-password"
+
 # IDP Passwords (optional)
 # admin_password     = "your-admin-password"
 # developer_password = "your-developer-password"

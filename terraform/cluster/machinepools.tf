@@ -7,14 +7,6 @@
 # - OpenShift AI workloads requiring GPU instances
 # - Workloads with specific resource requirements
 # - Isolating workloads by node type
-#
-# IMPORTANT: MachinePool作成時の認証について
-# - サービスアカウント（RHCS_CLIENT_ID / RHCS_CLIENT_SECRET）では
-#   403エラーが発生する場合があります。
-# - その場合は、RHCS_TOKENを使用してください:
-#     rosa login --use-auth-code  # または --use-device-code
-#     export RHCS_TOKEN=$(rosa token)
-# - RHCS_TOKENは一時トークンで有効期限が短いため、長時間の操作には注意が必要です。
 
 resource "rhcs_hcp_machine_pool" "additional" {
   for_each = {

@@ -5,8 +5,6 @@
 # 
 # このスクリプトは以下を実行します：
 # 1. Terraformを使用してROSA HCPクラスターを構築
-# 2. (今後) Ansibleを使用してOpenShift設定を実行
-# 3. (今後) GitOps/ArgoCDのセットアップ
 ###############################################################################
 
 set -e  # エラーが発生したら即座に終了
@@ -276,39 +274,6 @@ EOF
     mv "$TMP_FILE" terraform.tfvars
     rm -f terraform.tfvars.bak 2>/dev/null || true
     
-    # MachinePool作成時の認証確認
-    # additional_machine_poolsが定義されている場合、RHCS_TOKENが必要な場合があります
-    if grep -q "additional_machine_pools" terraform.tfvars 2>/dev/null && ! grep -q "^additional_machine_pools\s*=\s*\[\s*\]" terraform.tfvars 2>/dev/null; then
-        log_info "additional_machine_poolsが定義されています"
-        
-        # RHCS_TOKENが設定されていない場合、自動取得を試みる
-        if [ -z "$RHCS_TOKEN" ]; then
-            log_warning "RHCS_TOKENが設定されていません"
-            log_info "MachinePool作成時にはRHCS_TOKENが必要な場合があります"
-            
-            # rosa loginが完了しているか確認
-            if rosa whoami > /dev/null 2>&1; then
-                log_info "ROSAにログイン済みです。RHCS_TOKENを取得中..."
-                if RHCS_TOKEN=$(rosa token 2>/dev/null); then
-                    export RHCS_TOKEN
-                    log_success "RHCS_TOKENを取得しました"
-                else
-                    log_warning "RHCS_TOKENの取得に失敗しました"
-                    log_info "手動で取得する場合は以下を実行してください："
-                    echo "  rosa login --use-auth-code  # または --use-device-code"
-                    echo "  export RHCS_TOKEN=\$(rosa token)"
-                fi
-            else
-                log_warning "ROSAにログインしていません"
-                log_info "RHCS_TOKENを取得するには、まずROSAにログインしてください："
-                echo "  rosa login --use-auth-code  # または --use-device-code"
-                echo "  export RHCS_TOKEN=\$(rosa token)"
-            fi
-        else
-            log_info "RHCS_TOKENが既に設定されています"
-        fi
-    fi
-    
     # Terraform初期化
     log_info "Terraformの初期化中..."
     terraform init
@@ -458,10 +423,7 @@ main() {
     echo "  1. クラスターにログイン"
     echo "     oc login <API_URL> -u cluster-admin -p <PASSWORD>"
     echo ""
-    echo "  2. (準備中) Ansibleで追加設定を実行"
-    echo "     cd ansible && ansible-playbook site.yml"
-    echo ""
-    echo "  3. OpenShift Consoleにアクセス"
+    echo "  2. OpenShift Consoleにアクセス"
     echo "     上記のConsole URLをブラウザで開いてください"
     echo ""
 }

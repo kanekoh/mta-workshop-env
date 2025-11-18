@@ -1,0 +1,24 @@
+---
+# Main playbook for OpenShift post-deployment configuration
+- name: Configure OpenShift Cluster
+  hosts: openshift
+  gather_facts: true
+  vars:
+    cluster_info_file: "{{ playbook_dir }}/../cluster_info.json"
+  
+  tasks:
+    - name: Load cluster information from Terraform output
+      set_fact:
+        cluster_info: "{{ lookup('file', cluster_info_file) | from_json }}"
+      when: cluster_info_file is defined
+    
+    - name: Set cluster connection variables
+      set_fact:
+        cluster_api_url: "{{ cluster_info.cluster.api_url }}"
+        cluster_console_url: "{{ cluster_info.cluster.console_url }}"
+        cluster_name: "{{ cluster_info.cluster.name }}"
+        cluster_domain: "{{ cluster_info.cluster.domain }}"
+      when: cluster_info is defined
+    
+- import_playbook: install_gitops.yml
+

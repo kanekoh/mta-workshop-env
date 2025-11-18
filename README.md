@@ -62,30 +62,12 @@
    
    **Terraformプロバイダー用の認証:**
    
-   TerraformのRHCSプロバイダーは、以下の2つの認証方法をサポートしています：
+   TerraformのRHCSプロバイダーは、サービスアカウントを使用します：
    
-   **方法1: サービスアカウント（推奨、ただし一部操作で権限不足の可能性あり）**
    ```bash
    export RHCS_CLIENT_ID="YOUR_RHCS_CLIENT_ID"
    export RHCS_CLIENT_SECRET="YOUR_RHCS_CLIENT_SECRET"
    ```
-   
-   **方法2: 一時トークン（MachinePool作成時など、一部操作で必要）**
-   ```bash
-   # まず rosa login を実行
-   rosa login --use-auth-code  # または --use-device-code
-   
-   # その後、トークンを取得
-   export RHCS_TOKEN=$(rosa token)
-   ```
-   
-   **重要: MachinePool作成時の認証について**
-   
-   - サービスアカウント（RHCS_CLIENT_ID / RHCS_CLIENT_SECRET）では、MachinePool作成時に
-     403エラーが発生する場合があります。
-   - その場合は、RHCS_TOKENを使用してください。
-   - RHCS_TOKENは一時トークンで有効期限が短いため、長時間の `terraform apply` や
-     自動化用途では注意が必要です。
 
 3. **ROSA初期化**
    ```bash
@@ -231,8 +213,7 @@ TerraformでROSAクラスターが構築された後、Ansibleを使用して以
 
 ```bash
 cd ../ansible
-# Ansible playbook の実行（準備中）
-# ansible-playbook site.yml
+ansible-playbook site.yml
 ```
 
 ## 環境の削除
@@ -277,77 +258,6 @@ terraform destroy
 ⚠️ **警告**: このコマンドは、作成されたすべてのリソース（クラスター、VPC、サブネットなど）を削除します。
 
 **注意**: AnsibleやGitOpsで作成されたOpenShiftリソースは、クラスター削除とともに自動的に削除されます。
-
-## 既知の問題
-
-このセクションでは、現在把握している既知の問題と対処方法を記載しています。
-
-### 1. RHCS_TOKEN の有効期限によるエラー
-
-**問題**: クラスター構築時（特にMachinePool作成時）に `RHCS_TOKEN` が必要なケースがありますが、`RHCS_TOKEN` は一時トークンで有効期限が短いため、長時間の `terraform apply` 実行中にトークンが期限切れとなり、コマンドが失敗する場合があります。
-
-**対処方法**:
-- エラーが発生した場合は、`RHCS_TOKEN` を再取得してから `terraform apply` を再実行してください：
-  ```bash
-  # ROSAにログイン（必要に応じて）
-  rosa login --use-auth-code  # または --use-device-code
-  
-  # トークンを再取得
-  export RHCS_TOKEN=$(rosa token)
-  
-  # Terraformを再実行
-  cd terraform/cluster
-  terraform apply
-  ```
-- `deploy.sh` スクリプトを使用している場合、`additional_machine_pools` が定義されていると自動的に `RHCS_TOKEN` の取得を試みますが、長時間の操作ではトークンが期限切れになる可能性があります。
-
-**回避策**:
-- 可能な限り、サービスアカウント（`RHCS_CLIENT_ID` / `RHCS_CLIENT_SECRET`）を使用してください。ただし、MachinePool作成時など一部の操作では `RHCS_TOKEN` が必要な場合があります。
-
-### 2. リソース削除時の依存関係エラー
-
-**問題**: 環境削除時（`terraform destroy`）に、リソースの削除順序の関係からエラーが発生する可能性があります。特に、ネットワークリソース（VPC、サブネットなど）の削除時に、ROSAクラスターが作成したENI（Elastic Network Interface）などの依存リソースが完全に削除されていない場合に `DependencyViolation` エラーが発生することがあります。
-
-**対処方法**:
-- `destroy.sh` スクリプトを使用している場合、自動的にENIのクリーンアップを待機してから再試行します。
-- 手動で削除する場合、エラーが発生したら数分待ってから再度 `terraform destroy` を実行してください：
-  ```bash
-  # エラーが発生した場合
-  cd terraform/network
-  # 数分待機（ENIのクリーンアップを待つ）
-  sleep 300  # 5分待機
-  
-  # 再度実行
-  terraform destroy
-  ```
-- クラスターが完全に削除されるまで待機してから、ネットワークリソースの削除を実行してください。
-
-**回避策**:
-- `destroy.sh` スクリプトを使用することで、自動的に適切な順序で削除が実行されます。
-
-### 3. MachinePool作成時の権限エラー（403 Forbidden）
-
-**問題**: TerraformでMachinePoolを作成する際、サービスアカウント（`RHCS_CLIENT_ID` / `RHCS_CLIENT_SECRET`）を使用している場合、403 Forbiddenエラーが発生することがあります。これは、サービスアカウントにMachinePool作成に必要な権限が不足している可能性があります。
-
-**対処方法**:
-- 一時的に `RHCS_TOKEN` を使用することで回避できます：
-  ```bash
-  # ROSAにログイン
-  rosa login --use-auth-code  # または --use-device-code
-  
-  # トークンを取得
-  export RHCS_TOKEN=$(rosa token)
-  
-  # Terraformを実行
-  cd terraform/cluster
-  terraform apply
-  ```
-- `deploy.sh` スクリプトを使用している場合、`additional_machine_pools` が定義されていると自動的に `RHCS_TOKEN` の取得を試みます。
-
-**注意**:
-- この問題は、サービスアカウントの権限設定に関する可能性があります。
-- Red Hatサポートまたは社内のROSA担当者に確認して、サービスアカウントに適切な権限を付与する必要があるかもしれません。
-- 現時点では、`RHCS_TOKEN` を使用することで回避できますが、長期的にはサービスアカウントの権限を適切に設定することが推奨されます。
 
 ## トラブルシューティング
 
@@ -395,11 +305,11 @@ rosa logs install -c mta-lightspeed --watch
 │       ├── locals.tf            # ローカル変数
 │       ├── outputs.tf           # 出力定義
 │       └── terraform.tfvars.example
-├── ansible/                      # Ansible設定（準備中）
+├── ansible/                      # Ansible設定
 │   ├── inventory/
 │   ├── playbooks/
 │   └── roles/
-└── gitops/                       # GitOps設定（準備中）
+└── gitops/                       # GitOps設定
     └── argocd/
 ```
 
