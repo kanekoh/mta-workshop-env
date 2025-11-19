@@ -5,7 +5,66 @@
 # 
 # このスクリプトは以下を実行します：
 # 1. Terraformを使用してROSA HCPクラスターを構築
+#
+# オプション:
+#   --log-file <file>    ログを指定ファイルに出力
+#   -l, --log            ログをデフォルトファイル名で出力（deploy-YYYYMMDD-HHMMSS.log）
+#   -h, --help           ヘルプを表示
+#
+# 環境変数:
+#   DEPLOY_LOG_FILE      ログファイルパス（--log-fileオプションで上書き可能）
 ###############################################################################
+
+# ログファイル設定（環境変数から読み込み）
+LOG_FILE="${DEPLOY_LOG_FILE:-}"
+
+# オプション解析
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --log-file)
+            LOG_FILE="$2"
+            shift 2
+            ;;
+        -l|--log)
+            if [ -z "$LOG_FILE" ]; then
+                LOG_FILE="deploy-$(date +%Y%m%d-%H%M%S).log"
+            fi
+            shift
+            ;;
+        -h|--help)
+            cat << EOF
+Usage: $0 [OPTIONS]
+
+Options:
+  --log-file <file>    Log output to specified file
+  -l, --log            Log output to default file (deploy-YYYYMMDD-HHMMSS.log)
+  -h, --help           Show this help message
+
+Environment Variables:
+  DEPLOY_LOG_FILE      Log file path (overridden by --log-file option)
+
+Examples:
+  $0 --log
+  $0 --log-file my-deploy.log
+  DEPLOY_LOG_FILE=deploy.log $0
+EOF
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Use -h or --help for usage information" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# ログファイルが指定されている場合、teeで出力をリダイレクト
+if [ -n "$LOG_FILE" ]; then
+    exec > >(tee -a "$LOG_FILE") 2>&1
+    echo "ログファイル: $LOG_FILE"
+    echo "開始時刻: $(date)"
+    echo "========================================"
+fi
 
 set -e  # エラーが発生したら即座に終了
 
@@ -283,29 +342,22 @@ EOF
     terraform plan -out=tfplan
     
     # Terraform適用
-    log_info "Terraformを適用中（時間がかかります）..."
+    log_info "Terraformを適用中（時間がかかります、約30-40分）..."
+    log_info "注意: wait_for_create_complete = true のため、Terraformがクラスター構築の完了を待機します"
     terraform apply tfplan
     
-    log_success "Terraformによるデプロイリクエストが送信されました！"
-    log_info "注意: wait_for_create_complete = false のため、Terraformは即座に完了します"
-    log_info "次のステップで rosa logs install でクラスター構築の進行状況を監視します"
+    log_success "Terraformによるクラスター構築が完了しました！"
     echo ""
     
-    # 出力情報の表示（クラスターIDが利用可能な場合）
+    # 出力情報の表示（wait_for_create_complete = trueなので、情報は確実に取得できる）
     echo ""
     log_info "==== クラスター情報 ===="
     CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "N/A")
     CLUSTER_ID=$(terraform output -raw cluster_id 2>/dev/null || echo "N/A")
     echo "クラスター名: ${CLUSTER_NAME}"
     echo "クラスターID: ${CLUSTER_ID}"
-    
-    if [ "$CLUSTER_ID" != "N/A" ]; then
-        echo "API URL: $(terraform output -raw cluster_api_url 2>/dev/null || echo "準備中...")"
-        echo "Console URL: $(terraform output -raw cluster_console_url 2>/dev/null || echo "準備中...")"
-    else
-        echo "API URL: 準備中..."
-        echo "Console URL: 準備中..."
-    fi
+    echo "API URL: $(terraform output -raw cluster_api_url 2>/dev/null || echo "N/A")"
+    echo "Console URL: $(terraform output -raw cluster_console_url 2>/dev/null || echo "N/A")"
     
     echo ""
     log_info "クラスターが準備できたら、以下でログインできます："
@@ -320,39 +372,6 @@ EOF
     terraform output -json ansible_inventory_json > ../../ansible/cluster_info.json
     
     cd ../..
-}
-
-# クラスター構築のログを監視して完了を待つ
-wait_for_cluster_ready() {
-    log_info "クラスター構築の進行状況を監視します..."
-    
-    cd terraform/cluster
-    
-    # クラスター名を取得
-    CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
-    if [ -z "$CLUSTER_NAME" ] || [ "$CLUSTER_NAME" = "N/A" ]; then
-        log_warning "クラスター名を取得できませんでした"
-        cd ../..
-        return 1
-    fi
-    
-    cd ../..
-    
-    log_info "クラスター名: ${CLUSTER_NAME}"
-    log_info "rosa logs install で構築ログを監視します..."
-    echo ""
-    log_warning "注意: クラスター構築には約30-40分かかります"
-    echo ""
-    
-    # rosa logs install --watch でログを監視
-    # このコマンドはクラスター構築が完了するまで待機します
-    if rosa logs install -c "${CLUSTER_NAME}" --watch; then
-        log_success "クラスター構築が完了しました！"
-        return 0
-    else
-        log_error "クラスター構築の監視中にエラーが発生しました"
-        return 1
-    fi
 }
 
 # クラスターへのログイン確認
@@ -405,10 +424,10 @@ main() {
     # ステップ4: フェーズ2 - ROSAクラスターの構築
     deploy_cluster
     
-    # ステップ5: クラスター構築の完了を待つ（rosa logs install --watch）
-    log_info "Terraformはクラスター作成リクエストを送信しました"
-    log_info "rosa logs install でクラスター構築の進行状況を監視します..."
-    wait_for_cluster_ready
+    # ステップ5: クラスター構築の完了確認
+    # Terraformが wait_for_create_complete = true で完了を待機したため、
+    # 追加の待機処理は不要です
+    log_info "クラスター構築はTerraformで完了しました"
     
     # ステップ6: クラスターアクセス確認
     verify_cluster_access
@@ -419,13 +438,71 @@ main() {
     log_success "  環境構築が完了しました！"
     log_success "======================================"
     echo ""
+    
+    # クラスター情報を取得して表示
+    cd terraform/cluster
+    CLUSTER_API=$(terraform output -raw cluster_api_url 2>/dev/null || echo "")
+    CONSOLE_URL=$(terraform output -raw cluster_console_url 2>/dev/null || echo "")
+    ADMIN_USER=$(terraform output -raw cluster_admin_username 2>/dev/null || echo "")
+    ADMIN_PASS=$(terraform output -raw cluster_admin_password 2>/dev/null || echo "")
+    cd ../..
+    
     log_info "次のステップ："
+    echo ""
     echo "  1. クラスターにログイン"
-    echo "     oc login <API_URL> -u cluster-admin -p <PASSWORD>"
+    if [ -n "$CLUSTER_API" ] && [ -n "$ADMIN_USER" ] && [ -n "$ADMIN_PASS" ]; then
+        echo "     oc login ${CLUSTER_API} -u ${ADMIN_USER} -p ${ADMIN_PASS}"
+    else
+        echo "     oc login <API_URL> -u cluster-admin -p <PASSWORD>"
+    fi
     echo ""
     echo "  2. OpenShift Consoleにアクセス"
-    echo "     上記のConsole URLをブラウザで開いてください"
+    if [ -n "$CONSOLE_URL" ]; then
+        echo "     ${CONSOLE_URL}"
+    else
+        echo "     上記のConsole URLをブラウザで開いてください"
+    fi
     echo ""
+    
+    # 補足: HTPasswd IDPユーザーの情報
+    # 環境変数（TF_VAR_*）から取得
+    ADMIN_COUNT="${TF_VAR_admin_count:-1}"
+    WORKSHOP_USER_COUNT="${TF_VAR_workshop_user_count:-20}"
+    ADMIN_PASSWORD="${TF_VAR_admin_password:-}"
+    WORKSHOP_PASSWORD="${TF_VAR_workshop_user_password:-}"
+    DEVELOPER_PASSWORD="${TF_VAR_developer_password:-}"
+    
+    # HTPasswd IDPユーザーが存在する場合、補足情報を表示
+    if [ -n "$ADMIN_PASSWORD" ] || [ -n "$WORKSHOP_PASSWORD" ] || [ -n "$DEVELOPER_PASSWORD" ]; then
+        echo ""
+        log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        log_info "補足: HTPasswd IDPユーザー"
+        log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        if [ -n "$ADMIN_PASSWORD" ] && [ -n "$CLUSTER_API" ]; then
+            if [ "$ADMIN_COUNT" = "1" ]; then
+                echo "  • 管理者ユーザー: admin"
+                echo "    ログイン例: oc login ${CLUSTER_API} -u admin -p ${ADMIN_PASSWORD}"
+            else
+                echo "  • 管理者ユーザー: admin, admin2, ..., admin${ADMIN_COUNT}"
+                echo "    ログイン例: oc login ${CLUSTER_API} -u admin -p ${ADMIN_PASSWORD}"
+            fi
+            echo ""
+        fi
+        
+        if [ -n "$WORKSHOP_PASSWORD" ] && [ -n "$CLUSTER_API" ]; then
+            echo "  • ワークショップユーザー: user1, user2, ..., user${WORKSHOP_USER_COUNT}"
+            echo "    ログイン例: oc login ${CLUSTER_API} -u user1 -p ${WORKSHOP_PASSWORD}"
+            echo ""
+        fi
+        
+        if [ -n "$DEVELOPER_PASSWORD" ] && [ -n "$CLUSTER_API" ]; then
+            echo "  • 開発者ユーザー: developer"
+            echo "    ログイン例: oc login ${CLUSTER_API} -u developer -p ${DEVELOPER_PASSWORD}"
+            echo ""
+        fi
+    fi
 }
 
 # スクリプト実行

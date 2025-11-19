@@ -6,11 +6,70 @@
 # このスクリプトは以下を実行します：
 # 1. Terraformを使用してROSA HCPクラスターを削除
 # 2. rosaコマンドでクラスター削除の完了を確認
+#
+# オプション:
+#   --log-file <file>    ログを指定ファイルに出力
+#   -l, --log            ログをデフォルトファイル名で出力（destroy-YYYYMMDD-HHMMSS.log）
+#   -h, --help           ヘルプを表示
+#
+# 環境変数:
+#   DESTROY_LOG_FILE     ログファイルパス（--log-fileオプションで上書き可能）
 ###############################################################################
 
 # スクリプトのディレクトリを取得（プロジェクトルートに移動）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# ログファイル設定（環境変数から読み込み）
+LOG_FILE="${DESTROY_LOG_FILE:-}"
+
+# オプション解析
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --log-file)
+            LOG_FILE="$2"
+            shift 2
+            ;;
+        -l|--log)
+            if [ -z "$LOG_FILE" ]; then
+                LOG_FILE="destroy-$(date +%Y%m%d-%H%M%S).log"
+            fi
+            shift
+            ;;
+        -h|--help)
+            cat << EOF
+Usage: $0 [OPTIONS]
+
+Options:
+  --log-file <file>    Log output to specified file
+  -l, --log            Log output to default file (destroy-YYYYMMDD-HHMMSS.log)
+  -h, --help           Show this help message
+
+Environment Variables:
+  DESTROY_LOG_FILE     Log file path (overridden by --log-file option)
+
+Examples:
+  $0 --log
+  $0 --log-file my-destroy.log
+  DESTROY_LOG_FILE=destroy.log $0
+EOF
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Use -h or --help for usage information" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# ログファイルが指定されている場合、teeで出力をリダイレクト
+if [ -n "$LOG_FILE" ]; then
+    exec > >(tee -a "$LOG_FILE") 2>&1
+    echo "ログファイル: $LOG_FILE"
+    echo "開始時刻: $(date)"
+    echo "========================================"
+fi
 
 # set -e をコメントアウト（エラーを無視して続行するため）
 # set -e  # エラーが発生したら即座に終了

@@ -41,12 +41,12 @@ module "rosa_hcp" {
   # --- Admin ユーザ作成 ---
   create_admin_user = var.create_admin_user
   
-  cluster_admin_username = var.cluster_admin_username
-  cluster_admin_password = var.cluster_admin_password
+  admin_credentials_username = var.cluster_admin_username
+  admin_credentials_password = var.cluster_admin_password
 
   # クラスター作成の待機を無効化（IDP作成を並行して実行するため）
-  wait_for_create_complete            = false
-  wait_for_std_compute_nodes_complete = false
+  wait_for_create_complete            = true
+  wait_for_std_compute_nodes_complete = true
 }
 
 # HTPasswd IDP for admin + workshop users
