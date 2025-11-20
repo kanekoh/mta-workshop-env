@@ -13,4 +13,15 @@ openshift_gitops:
   # ArgoCD instance settings (for reference)
   argocd_namespace: openshift-gitops
   argocd_instance_name: openshift-gitops
+  
+  # GitOps Repository Configuration (for App of Apps pattern)
+  gitops_repo:
+    url: https://github.com/kanekoh/mta-workshop-env.git
+    branch: main
+    path: gitops/apps  # App of Apps will monitor this directory
+  
+  # App of Apps Configuration
+  app_of_apps:
+    enabled: true
+    name: gitops-app-of-apps
 

@@ -13,29 +13,7 @@
         labels:
           openshift.io/cluster-monitoring: "true"
 
-- name: Create AppProject for GitOps applications
-  kubernetes.core.k8s:
-    name: gitops-apps
-    namespace: "{{ openshift_gitops.argocd_namespace }}"
-    api_version: argoproj.io/v1alpha1
-    kind: AppProject
-    state: present
-    definition:
-      spec:
-        description: "GitOps applications project"
-        sourceRepos:
-          - '*'
-        destinations:
-          - namespace: '*'
-            server: '*'
-        clusterResourceWhitelist:
-          - group: '*'
-            kind: '*'
-        namespaceResourceWhitelist:
-          - group: '*'
-            kind: '*'
-
-- name: Create AppOfApps Application (empty application that doesn't fail)
+- name: Create AppOfApps Application (monitors gitops/apps directory)
   kubernetes.core.k8s:
     name: "{{ openshift_gitops.app_of_apps.name }}"
     namespace: "{{ openshift_gitops.argocd_namespace }}"
@@ -49,61 +27,28 @@
         finalizers:
           - resources-finalizer.argocd.argoproj.io
       spec:
-        project: gitops-apps
+        project: default
         source:
-          repoURL: "{{ openshift_gitops.gitops_repo.url | default('https://github.com/argoproj/argocd-example-apps') }}"
-          targetRevision: "{{ openshift_gitops.gitops_repo.branch | default('HEAD') }}"
-          path: "{{ openshift_gitops.gitops_repo.path | default('') }}"
-          # Empty directory with recurse=false to avoid errors when path is empty
+          repoURL: "{{ openshift_gitops.gitops_repo.url }}"
+          targetRevision: "{{ openshift_gitops.gitops_repo.branch | default('main') }}"
+          path: "{{ openshift_gitops.gitops_repo.path }}"
           directory:
-            recurse: false
+            recurse: true  # Recursively discover Application definitions in gitops/apps
         destination:
           server: https://kubernetes.default.svc
           namespace: "{{ openshift_gitops.argocd_namespace }}"
         syncPolicy:
           automated:
-            prune: false
-            selfHeal: false
+            prune: true
+            selfHeal: true
           syncOptions:
             - CreateNamespace=false
             - PrunePropagationPolicy=foreground
             - PruneLast=true
-            - SkipDryRunOnMissingResource=true
   when: 
     - openshift_gitops.app_of_apps.enabled | default(false)
+    - openshift_gitops.gitops_repo.url is defined
     - openshift_gitops.gitops_repo.url | length > 0
-
-- name: Create ArgoCD Application for GitOps repository (if repository URL is provided)
-  kubernetes.core.k8s:
-    name: gitops-repo
-    namespace: "{{ openshift_gitops.argocd_namespace }}"
-    api_version: argoproj.io/v1alpha1
-    kind: Application
-    state: present
-    definition:
-      metadata:
-        name: gitops-repo
-        namespace: "{{ openshift_gitops.argocd_namespace }}"
-        finalizers:
-          - resources-finalizer.argocd.argoproj.io
-      spec:
-        project: gitops-apps
-        source:
-          repoURL: "{{ openshift_gitops.gitops_repo.url }}"
-          targetRevision: "{{ openshift_gitops.gitops_repo.branch | default('main') }}"
-          path: "{{ openshift_gitops.gitops_repo.path | default('.') }}"
-        destination:
-          server: https://kubernetes.default.svc
-          namespace: default
-        syncPolicy:
-          automated:
-            prune: true
-            selfHeal: true
-          syncOptions:
-            - CreateNamespace=true
-            - PrunePropagationPolicy=foreground
-            - PruneLast=true
-  when: 
-    - openshift_gitops.gitops_repo.url | length > 0
-    - openshift_gitops.app_of_apps.name != "gitops-repo"
+    - openshift_gitops.gitops_repo.path is defined
+    - openshift_gitops.gitops_repo.path | length > 0
 

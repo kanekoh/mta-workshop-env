@@ -11,6 +11,18 @@
       set_fact:
         cluster_info: "{{ lookup('file', cluster_info_file) | from_json }}"
       when: cluster_info_file is defined
+      register: cluster_info_result
+      failed_when: false
+    
+    - name: Verify cluster_info was loaded correctly
+      assert:
+        that:
+          - cluster_info is defined
+          - cluster_info.cluster is defined
+          - cluster_info.cluster.api_url is defined
+        fail_msg: "Failed to load cluster_info.json. Please check the file format."
+        success_msg: "Cluster information loaded successfully."
+      when: cluster_info_file is defined
     
     - name: Set cluster connection variables
       set_fact:
@@ -18,7 +30,9 @@
         cluster_console_url: "{{ cluster_info.cluster.console_url }}"
         cluster_name: "{{ cluster_info.cluster.name }}"
         cluster_domain: "{{ cluster_info.cluster.domain }}"
-      when: cluster_info is defined
+      when: 
+        - cluster_info is defined
+        - cluster_info.cluster is defined
     
 - import_playbook: install_gitops.yml
 
