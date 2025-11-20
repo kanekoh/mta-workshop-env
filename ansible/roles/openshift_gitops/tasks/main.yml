@@ -6,3 +6,6 @@
 - name: Wait for Operator to be ready
   include_tasks: wait_operator.yml
 
+- name: Configure ArgoCD Applications
+  include_tasks: configure_argocd.yml
+
