@@ -15,6 +15,10 @@
 #   DEPLOY_LOG_FILE      ログファイルパス（--log-fileオプションで上書き可能）
 ###############################################################################
 
+# スクリプトのディレクトリを取得（プロジェクトルートに移動）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # ログファイル設定（環境変数から読み込み）
 LOG_FILE="${DEPLOY_LOG_FILE:-}"
 FORCE_DEPLOY=false
