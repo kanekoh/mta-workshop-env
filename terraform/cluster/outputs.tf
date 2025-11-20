@@ -33,6 +33,7 @@ output "cluster_admin_username" {
 output "cluster_admin_password" {
   description = "Cluster admin password (sensitive)"
   value       = var.create_admin_user ? module.rosa_hcp.cluster_admin_password : "N/A"
+  sensitive   = true
 }
 
 # OIDC Information
