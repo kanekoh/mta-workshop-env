@@ -108,8 +108,8 @@ print_banner() {
     echo -e "${BLUE}"
     cat << "EOF"
 ╔═══════════════════════════════════════════════════════════════╗
-║  MTA for Developer Lightspeed Workshop Environment          ║
-║  Red Hat OpenShift for AWS (ROSA) Cluster Setup              ║
+║  MTA for Developer Lightspeed Workshop Environment            ║
+║  Red Hat OpenShift for AWS (ROSA) Cluster Setup               ║
 ╚═══════════════════════════════════════════════════════════════╝
 EOF
     echo -e "${NC}"
