@@ -10,32 +10,143 @@
 
 ## 前提条件
 
+### 対応OS
+
+- **macOS**: 完全対応
+- **Linux**: 完全対応（Ubuntu、RHEL、CentOS、Fedoraなど）
+- **Windows**: ネイティブWindowsでは動作しません。WSL2（Windows Subsystem for Linux 2）での使用を推奨します *未検証
+
 ### 必要なツール
 
 1. **Terraform** (>= 1.5.0)
+   
+   **macOS:**
    ```bash
    brew install terraform
    ```
+   
+   **Linux (Ubuntu/Debian):**
+   ```bash
+   wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+   echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+   sudo apt update && sudo apt install terraform
+   ```
+   
+   **Linux (RHEL/CentOS/Fedora):**
+   ```bash
+   sudo dnf install -y dnf-plugins-core
+   sudo dnf config-manager --add-repo https://rpm.releases.hashicorp.com/fedora/hashicorp.repo
+   sudo dnf install -y terraform
+   ```
 
 2. **AWS CLI** (>= 2.0)
+   
+   **macOS:**
    ```bash
    brew install awscli
    ```
+   
+   **Linux:**
+   ```bash
+   # インストーラーを使用（推奨）
+   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+   unzip awscliv2.zip
+   sudo ./aws/install
+   
+   # または、パッケージマネージャーを使用
+   # Ubuntu/Debian:
+   sudo apt install awscli
+   # RHEL/CentOS/Fedora:
+   sudo dnf install awscli
+   ```
 
 3. **ROSA CLI**
+   
+   **macOS:**
    ```bash
    brew install rosa-cli
    ```
+   
+   **Linux:**
+   ```bash
+   wget https://mirror.openshift.com/pub/openshift-v4/clients/rosa/latest/rosa-linux.tar.gz
+   tar xzf rosa-linux.tar.gz
+   sudo mv rosa /usr/local/bin/
+   ```
 
 4. **Ansible** (>= 2.14) - 後続のステップで使用
+   
+   **macOS:**
    ```bash
    brew install ansible
    ```
+   
+   **Linux (Ubuntu/Debian):**
+   ```bash
+   sudo apt update
+   sudo apt install ansible
+   ```
+   
+   **Linux (RHEL/CentOS/Fedora):**
+   ```bash
+   sudo dnf install ansible
+   ```
+   
+   **pipを使用する場合（全OS共通）:**
+   ```bash
+   pip3 install ansible
+   ```
 
 5. **OpenShift CLI (oc)**
+   
+   **macOS:**
    ```bash
    brew install openshift-cli
    ```
+   
+   **Linux:**
+   ```bash
+   wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+   tar xzf openshift-client-linux.tar.gz
+   sudo mv oc /usr/local/bin/
+   ```
+
+6. **jq** (JSONパーサー、推奨)
+   
+   **macOS:**
+   ```bash
+   brew install jq
+   ```
+   
+   **Linux (Ubuntu/Debian):**
+   ```bash
+   sudo apt install jq
+   ```
+   
+   **Linux (RHEL/CentOS/Fedora):**
+   ```bash
+   sudo dnf install jq
+   ```
+
+### Windowsでの使用について
+
+このスクリプトはbashスクリプトのため、**ネイティブWindowsでは動作しません**。
+
+Windowsで使用する場合は、**WSL2 (Windows Subsystem for Linux 2)** を使用してください：
+
+1. **WSL2のインストール**
+   ```powershell
+   # PowerShell (管理者権限)で実行
+   wsl --install
+   ```
+
+2. **Linuxディストリビューションのインストール**
+   - UbuntuなどのLinuxディストリビューションをインストール
+   - 上記のLinux手順に従ってツールをインストール
+
+3. **WSL2での実行**
+   - WSL2のターミナルでこのリポジトリをクローン
+   - 上記のLinux手順に従ってセットアップ
 
 ### 必要な認証情報
 

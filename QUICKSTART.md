@@ -6,10 +6,73 @@
 
 ### ステップ 1: 必要なツールのインストール
 
+**macOS:**
 ```bash
-# macOS の場合
-brew install terraform awscli rosa-cli openshift-cli ansible
+brew install terraform awscli rosa-cli openshift-cli ansible jq
 ```
+
+**Linux (Ubuntu/Debian):**
+```bash
+# Terraform
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
+
+# AWS CLI
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip && sudo ./aws/install
+
+# ROSA CLI
+wget https://mirror.openshift.com/pub/openshift-v4/clients/rosa/latest/rosa-linux.tar.gz
+tar xzf rosa-linux.tar.gz && sudo mv rosa /usr/local/bin/
+
+# OpenShift CLI
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+tar xzf openshift-client-linux.tar.gz && sudo mv oc /usr/local/bin/
+
+# Ansible & jq
+sudo apt install ansible jq
+```
+
+**Linux (RHEL/CentOS/Fedora):**
+```bash
+# Terraform
+sudo dnf install -y dnf-plugins-core
+sudo dnf config-manager --add-repo https://rpm.releases.hashicorp.com/fedora/hashicorp.repo
+sudo dnf install -y terraform
+
+# AWS CLI
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip && sudo ./aws/install
+
+# ROSA CLI
+wget https://mirror.openshift.com/pub/openshift-v4/clients/rosa/latest/rosa-linux.tar.gz
+tar xzf rosa-linux.tar.gz && sudo mv rosa /usr/local/bin/
+
+# OpenShift CLI
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+tar xzf openshift-client-linux.tar.gz && sudo mv oc /usr/local/bin/
+
+# Ansible & jq
+sudo dnf install ansible jq
+```
+
+**Windows:**
+このスクリプトはbashスクリプトのため、**ネイティブWindowsでは動作しません**。
+
+Windowsで使用する場合は、**WSL2 (Windows Subsystem for Linux 2)** を使用してください：
+
+1. **WSL2のインストール**
+   ```powershell
+   # PowerShell (管理者権限)で実行
+   wsl --install
+   ```
+
+2. **Linuxディストリビューションのインストール**
+   - UbuntuなどのLinuxディストリビューションをインストール
+
+3. **ツールのインストール**
+   - WSL2のターミナルで上記のLinux手順に従ってツールをインストール
 
 ### ステップ 2: 認証情報の準備
 
