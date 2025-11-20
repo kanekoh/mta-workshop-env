@@ -6,10 +6,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "3"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
   operand:
     imagePullPolicy: IfNotPresent
     servicePort: 12000
-spec:
   workerConfig:
     configData: |
       core:
@@ -118,12 +118,3 @@ spec:
       #            vendor: ["15b3"]
       #            device: ["1014", "1017"]
       #          loadedKMod : ["vendor_kmod1", "vendor_kmod2"]
-  customConfig:
-    configData: |
-      #    - name: "more.kernel.features"
-      #      matchOn:
-      #      - loadedKMod: ["example_kmod3"]
-      #    - name: "more.features.by.nodename"
-      #      value: customValue
-      #      matchOn:
-      #      - nodename: ["special-.*-node-.*"]
