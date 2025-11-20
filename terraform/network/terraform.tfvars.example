@@ -41,9 +41,4 @@
 #   Tags の Environment と Project は variables.tf のデフォルト値と同じため、
 #   Owner などの追加タグのみ設定する場合は、Environment と Project も含める必要があります
 #   (Terraformでは tags 変数を設定するとデフォルト値が完全に上書きされます)
-tags = {
-  Environment = "Workshop"
-  Project     = "MTA-for-Developer-Lightspeed"
-  Owner       = "Your Name"
-}
 
