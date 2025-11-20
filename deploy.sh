@@ -690,8 +690,12 @@ main() {
     # ステップ7: クラスターアクセス確認
     verify_cluster_access
     
-    # ステップ8: Ansibleによる追加設定
-    run_ansible
+    # ステップ8: Ansibleによる追加設定（環境変数で有効化された場合のみ）
+    if [ "${RUN_ANSIBLE:-}" = "true" ]; then
+        run_ansible
+    else
+        log_info "Ansible実行はスキップされます（RUN_ANSIBLE=true を設定すると実行されます）"
+    fi
     
     # 完了メッセージ
     echo ""
