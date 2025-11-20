@@ -289,10 +289,19 @@ deploy_network() {
         # ネットワーク情報は既に存在するので、出力情報を表示
         echo ""
         log_info "==== ネットワーク情報 ===="
-        echo "VPC ID: $(terraform output -raw vpc_id 2>/dev/null || echo "N/A")"
-        echo "VPC CIDR: $(terraform output -raw vpc_cidr 2>/dev/null || echo "N/A")"
-        echo "Public Subnets: $(terraform output -json public_subnet_ids 2>/dev/null | jq -r 'join(", ")' || echo "N/A")"
-        echo "Private Subnets: $(terraform output -json private_subnet_ids 2>/dev/null | jq -r 'join(", ")' || echo "N/A")"
+        # 全出力を一度に取得
+        NETWORK_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+        if command -v jq > /dev/null 2>&1; then
+            echo "VPC ID: $(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_id.value // "N/A"')"
+            echo "VPC CIDR: $(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_cidr.value // "N/A"')"
+            echo "Public Subnets: $(echo "$NETWORK_OUTPUTS" | jq -r '.public_subnet_ids.value // [] | join(", ")')"
+            echo "Private Subnets: $(echo "$NETWORK_OUTPUTS" | jq -r '.private_subnet_ids.value // [] | join(", ")')"
+        else
+            echo "VPC ID: $(terraform output -raw vpc_id 2>/dev/null || echo "N/A")"
+            echo "VPC CIDR: $(terraform output -raw vpc_cidr 2>/dev/null || echo "N/A")"
+            echo "Public Subnets: $(terraform output -json public_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ', ' | sed 's/, $//' || echo "N/A")"
+            echo "Private Subnets: $(terraform output -json private_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ', ' | sed 's/, $//' || echo "N/A")"
+        fi
         popd > /dev/null  # terraform/networkから戻る
         popd > /dev/null  # SCRIPT_DIRから戻る
         return 0
@@ -307,10 +316,19 @@ deploy_network() {
     # ネットワーク情報を出力
     echo ""
     log_info "==== ネットワーク情報 ===="
-    echo "VPC ID: $(terraform output -raw vpc_id)"
-    echo "VPC CIDR: $(terraform output -raw vpc_cidr)"
-    echo "Public Subnets: $(terraform output -json public_subnet_ids | jq -r 'join(", ")')"
-    echo "Private Subnets: $(terraform output -json private_subnet_ids | jq -r 'join(", ")')"
+    # 全出力を一度に取得
+    NETWORK_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+    if command -v jq > /dev/null 2>&1; then
+        echo "VPC ID: $(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_id.value // "N/A"')"
+        echo "VPC CIDR: $(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_cidr.value // "N/A"')"
+        echo "Public Subnets: $(echo "$NETWORK_OUTPUTS" | jq -r '.public_subnet_ids.value // [] | join(", ")')"
+        echo "Private Subnets: $(echo "$NETWORK_OUTPUTS" | jq -r '.private_subnet_ids.value // [] | join(", ")')"
+    else
+        echo "VPC ID: $(terraform output -raw vpc_id 2>/dev/null || echo "N/A")"
+        echo "VPC CIDR: $(terraform output -raw vpc_cidr 2>/dev/null || echo "N/A")"
+        echo "Public Subnets: $(terraform output -json public_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ', ' | sed 's/, $//' || echo "N/A")"
+        echo "Private Subnets: $(terraform output -json private_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ', ' | sed 's/, $//' || echo "N/A")"
+    fi
     
     popd > /dev/null  # terraform/networkから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
@@ -328,27 +346,61 @@ deploy_cluster() {
         return 1
     }
     
-    # ネットワークモジュールの出力を取得
+    # ネットワークモジュールの出力を取得（1回のコマンドで全出力を取得）
     log_info "ネットワークモジュールの出力を取得中..."
     pushd terraform/network > /dev/null || {
         log_error "terraform/network に移動できませんでした"
         popd > /dev/null
         return 1
     }
-    VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
-    VPC_CIDR=$(terraform output -raw vpc_cidr 2>/dev/null || echo "")
+    
+    # 全出力を一度に取得
+    NETWORK_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
     
     # jqが利用可能か確認
     if command -v jq > /dev/null 2>&1; then
-        PUBLIC_SUBNET_IDS=$(terraform output -json public_subnet_ids 2>/dev/null | jq -r 'join(",")' || echo "")
-        PRIVATE_SUBNET_IDS=$(terraform output -json private_subnet_ids 2>/dev/null | jq -r 'join(",")' || echo "")
-        AVAILABILITY_ZONES=$(terraform output -json availability_zones 2>/dev/null | jq -r 'join(",")' || echo "")
+        VPC_ID=$(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_id.value // ""')
+        VPC_CIDR=$(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_cidr.value // ""')
+        PUBLIC_SUBNET_IDS=$(echo "$NETWORK_OUTPUTS" | jq -r '.public_subnet_ids.value // [] | join(",")')
+        PRIVATE_SUBNET_IDS=$(echo "$NETWORK_OUTPUTS" | jq -r '.private_subnet_ids.value // [] | join(",")')
+        AVAILABILITY_ZONES=$(echo "$NETWORK_OUTPUTS" | jq -r '.availability_zones.value // [] | join(",")')
     else
-        # jqが利用できない場合、手動でパース
-        log_warning "jqが利用できません。手動でパースします..."
-        PUBLIC_SUBNET_IDS=$(terraform output -json public_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ',' | sed 's/,$//' || echo "")
-        PRIVATE_SUBNET_IDS=$(terraform output -json private_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ',' | sed 's/,$//' || echo "")
-        AVAILABILITY_ZONES=$(terraform output -json availability_zones 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ',' | sed 's/,$//' || echo "")
+        # jqが利用できない場合、Pythonでパース（フォールバック）
+        # Pythonは通常macOS/Linuxに標準でインストールされている
+        log_warning "jqが利用できません。Pythonでパースします..."
+        if command -v python3 > /dev/null 2>&1; then
+            # PythonでJSONをパース
+            eval "$(python3 << PYTHON_SCRIPT
+import sys
+import json
+
+try:
+    data = json.loads('''$NETWORK_OUTPUTS''')
+    vpc_id = data.get('vpc_id', {}).get('value', '')
+    vpc_cidr = data.get('vpc_cidr', {}).get('value', '')
+    public_subnet_ids = ','.join(data.get('public_subnet_ids', {}).get('value', []))
+    private_subnet_ids = ','.join(data.get('private_subnet_ids', {}).get('value', []))
+    availability_zones = ','.join(data.get('availability_zones', {}).get('value', []))
+    
+    print(f"VPC_ID='{vpc_id}'")
+    print(f"VPC_CIDR='{vpc_cidr}'")
+    print(f"PUBLIC_SUBNET_IDS='{public_subnet_ids}'")
+    print(f"PRIVATE_SUBNET_IDS='{private_subnet_ids}'")
+    print(f"AVAILABILITY_ZONES='{availability_zones}'")
+except Exception as e:
+    print("# Error parsing JSON", file=sys.stderr)
+    sys.exit(1)
+PYTHON_SCRIPT
+)"
+        else
+            # Pythonもない場合、個別にterraform outputを実行（最後の手段）
+            log_warning "Pythonも利用できません。個別にterraform outputを実行します..."
+            VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
+            VPC_CIDR=$(terraform output -raw vpc_cidr 2>/dev/null || echo "")
+            PUBLIC_SUBNET_IDS=$(terraform output -json public_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ',' | sed 's/,$//' || echo "")
+            PRIVATE_SUBNET_IDS=$(terraform output -json private_subnet_ids 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ',' | sed 's/,$//' || echo "")
+            AVAILABILITY_ZONES=$(terraform output -json availability_zones 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' ' | xargs -n1 | tr '\n' ',' | sed 's/,$//' || echo "")
+        fi
     fi
     
     if [ -z "$VPC_ID" ] || [ -z "$PUBLIC_SUBNET_IDS" ] || [ -z "$PRIVATE_SUBNET_IDS" ]; then
@@ -402,17 +454,32 @@ EOF
         # クラスター情報は既に存在するので、出力情報を表示
         echo ""
         log_info "==== クラスター情報 ===="
-        CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "N/A")
-        CLUSTER_ID=$(terraform output -raw cluster_id 2>/dev/null || echo "N/A")
+        # 全出力を一度に取得
+        CLUSTER_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+        if command -v jq > /dev/null 2>&1; then
+            CLUSTER_NAME=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_name.value // "N/A"')
+            CLUSTER_ID=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_id.value // "N/A"')
+            CLUSTER_API_URL=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_api_url.value // "N/A"')
+            CLUSTER_CONSOLE_URL=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_console_url.value // "N/A"')
+        else
+            CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "N/A")
+            CLUSTER_ID=$(terraform output -raw cluster_id 2>/dev/null || echo "N/A")
+            CLUSTER_API_URL=$(terraform output -raw cluster_api_url 2>/dev/null || echo "N/A")
+            CLUSTER_CONSOLE_URL=$(terraform output -raw cluster_console_url 2>/dev/null || echo "N/A")
+        fi
         echo "クラスター名: ${CLUSTER_NAME}"
         echo "クラスターID: ${CLUSTER_ID}"
-        echo "API URL: $(terraform output -raw cluster_api_url 2>/dev/null || echo "N/A")"
-        echo "Console URL: $(terraform output -raw cluster_console_url 2>/dev/null || echo "N/A")"
+        echo "API URL: ${CLUSTER_API_URL}"
+        echo "Console URL: ${CLUSTER_CONSOLE_URL}"
         
         # Ansible用のクラスター情報を保存（既に存在する場合でも更新）
         log_info "Ansible用のクラスター情報を保存中..."
         mkdir -p ../../ansible
-        terraform output -raw ansible_inventory_json > ../../ansible/cluster_info.json
+        if command -v jq > /dev/null 2>&1; then
+            echo "$CLUSTER_OUTPUTS" | jq -r '.ansible_inventory_json.value // ""' > ../../ansible/cluster_info.json
+        else
+            terraform output -raw ansible_inventory_json > ../../ansible/cluster_info.json
+        fi
         
         popd > /dev/null  # terraform/clusterから戻る
         popd > /dev/null  # SCRIPT_DIRから戻る
@@ -430,12 +497,23 @@ EOF
     # 出力情報の表示（wait_for_create_complete = trueなので、情報は確実に取得できる）
     echo ""
     log_info "==== クラスター情報 ===="
-    CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "N/A")
-    CLUSTER_ID=$(terraform output -raw cluster_id 2>/dev/null || echo "N/A")
+    # 全出力を一度に取得
+    CLUSTER_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+    if command -v jq > /dev/null 2>&1; then
+        CLUSTER_NAME=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_name.value // "N/A"')
+        CLUSTER_ID=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_id.value // "N/A"')
+        CLUSTER_API_URL=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_api_url.value // "N/A"')
+        CLUSTER_CONSOLE_URL=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_console_url.value // "N/A"')
+    else
+        CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "N/A")
+        CLUSTER_ID=$(terraform output -raw cluster_id 2>/dev/null || echo "N/A")
+        CLUSTER_API_URL=$(terraform output -raw cluster_api_url 2>/dev/null || echo "N/A")
+        CLUSTER_CONSOLE_URL=$(terraform output -raw cluster_console_url 2>/dev/null || echo "N/A")
+    fi
     echo "クラスター名: ${CLUSTER_NAME}"
     echo "クラスターID: ${CLUSTER_ID}"
-    echo "API URL: $(terraform output -raw cluster_api_url 2>/dev/null || echo "N/A")"
-    echo "Console URL: $(terraform output -raw cluster_console_url 2>/dev/null || echo "N/A")"
+    echo "API URL: ${CLUSTER_API_URL}"
+    echo "Console URL: ${CLUSTER_CONSOLE_URL}"
     
     echo ""
     log_info "クラスターが準備できたら、以下でログインできます："
@@ -447,7 +525,11 @@ EOF
     # Ansible用のクラスター情報を保存
     log_info "Ansible用のクラスター情報を保存中..."
     mkdir -p ../../ansible
-    terraform output -raw ansible_inventory_json > ../../ansible/cluster_info.json
+    if command -v jq > /dev/null 2>&1; then
+        echo "$CLUSTER_OUTPUTS" | jq -r '.ansible_inventory_json.value // ""' > ../../ansible/cluster_info.json
+    else
+        terraform output -raw ansible_inventory_json > ../../ansible/cluster_info.json
+    fi
     
     popd > /dev/null  # terraform/clusterから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
@@ -522,9 +604,17 @@ verify_cluster_access() {
         return 1
     }
     
-    CLUSTER_API=$(terraform output -raw cluster_api_url 2>/dev/null || echo "")
-    ADMIN_USER=$(terraform output -raw cluster_admin_username 2>/dev/null || echo "")
-    ADMIN_PASS=$(terraform output -raw cluster_admin_password 2>/dev/null || echo "")
+    # 全出力を一度に取得
+    CLUSTER_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+    if command -v jq > /dev/null 2>&1; then
+        CLUSTER_API=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_api_url.value // ""')
+        ADMIN_USER=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_admin_username.value // ""')
+        ADMIN_PASS=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_admin_password.value // ""')
+    else
+        CLUSTER_API=$(terraform output -raw cluster_api_url 2>/dev/null || echo "")
+        ADMIN_USER=$(terraform output -raw cluster_admin_username 2>/dev/null || echo "")
+        ADMIN_PASS=$(terraform output -raw cluster_admin_password 2>/dev/null || echo "")
+    fi
     
     popd > /dev/null  # terraform/clusterから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
@@ -616,10 +706,19 @@ main() {
         popd > /dev/null
         return 1
     }
-    CLUSTER_API=$(terraform output -raw cluster_api_url 2>/dev/null || echo "")
-    CONSOLE_URL=$(terraform output -raw cluster_console_url 2>/dev/null || echo "")
-    ADMIN_USER=$(terraform output -raw cluster_admin_username 2>/dev/null || echo "")
-    ADMIN_PASS=$(terraform output -raw cluster_admin_password 2>/dev/null || echo "")
+    # 全出力を一度に取得
+    CLUSTER_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+    if command -v jq > /dev/null 2>&1; then
+        CLUSTER_API=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_api_url.value // ""')
+        CONSOLE_URL=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_console_url.value // ""')
+        ADMIN_USER=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_admin_username.value // ""')
+        ADMIN_PASS=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_admin_password.value // ""')
+    else
+        CLUSTER_API=$(terraform output -raw cluster_api_url 2>/dev/null || echo "")
+        CONSOLE_URL=$(terraform output -raw cluster_console_url 2>/dev/null || echo "")
+        ADMIN_USER=$(terraform output -raw cluster_admin_username 2>/dev/null || echo "")
+        ADMIN_PASS=$(terraform output -raw cluster_admin_password 2>/dev/null || echo "")
+    fi
     popd > /dev/null  # terraform/clusterから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
     

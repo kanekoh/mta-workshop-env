@@ -228,9 +228,14 @@ get_cluster_name() {
         return 1
     }
     
-    # 方法1: Terraform outputから取得
-    if terraform output -raw cluster_name > /dev/null 2>&1; then
-        cluster_name=$(terraform output -raw cluster_name 2>/dev/null)
+    # 方法1: Terraform outputから取得（全出力を一度に取得）
+    CLUSTER_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+    if command -v jq > /dev/null 2>&1; then
+        cluster_name=$(echo "$CLUSTER_OUTPUTS" | jq -r '.cluster_name.value // ""')
+    else
+        if terraform output -raw cluster_name > /dev/null 2>&1; then
+            cluster_name=$(terraform output -raw cluster_name 2>/dev/null)
+        fi
     fi
     
     # 方法2: 環境変数から取得
@@ -539,13 +544,18 @@ wait_for_cluster_deletion() {
 wait_for_eni_cleanup() {
     log_info "VPC内のENI（Elastic Network Interface）のクリーンアップを待機中..."
     
-    # VPC IDを取得
+    # VPC IDを取得（全出力を一度に取得）
     pushd "$SCRIPT_DIR" > /dev/null || return 1
     pushd terraform/network > /dev/null || {
         popd > /dev/null
         return 1
     }
-    VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
+    NETWORK_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+    if command -v jq > /dev/null 2>&1; then
+        VPC_ID=$(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_id.value // ""')
+    else
+        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
+    fi
     popd > /dev/null  # terraform/networkから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
     
