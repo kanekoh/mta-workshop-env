@@ -5,7 +5,7 @@ metadata:
   namespace: openshift-nfd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=truespec:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   operand:
     imagePullPolicy: IfNotPresent
     servicePort: 12000
