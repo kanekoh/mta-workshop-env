@@ -43,10 +43,14 @@ spec:
           fi
           
           echo "Found GPU nodes: ${GPU_NODES}"
+
+          # ラベル app.kubernetes.io/component=nvidia-driver を持つDSを探す
+          DRIVER_DS_NAME=$(oc get daemonset -n nvidia-gpu-operator -l app.kubernetes.io/component=nvidia-driver -o jsonpath='{.items[0].metadata.name}' || echo "nvidia-driver-daemonset")
           
           # 待機するDaemonSetのリスト
           DAEMONSETS=(
-            "nvidia-driver-daemonset"
+            "${DRIVER_DS_NAME}"
+            "${CONTAINER_TOOLKIT_DS_NAME}"
             "nvidia-device-plugin-daemonset"
             "nvidia-dcgm-exporter"
             "nvidia-node-status-exporter"
