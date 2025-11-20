@@ -53,6 +53,9 @@ rosa login --use-device-code
 
 Terraform (RHCS provider) 向けの認証方法:
 
+以下のサイトで登録したサービスアカウントを利用してください。登録時にクライアントIDとシークレットが表示されます。
+https://console.redhat.com/iam/service-accounts/
+
 ```bash
 export RHCS_CLIENT_ID="YOUR_RHCS_CLIENT_ID"
 export RHCS_CLIENT_SECRET="YOUR_RHCS_CLIENT_SECRET"

@@ -142,6 +142,19 @@ check_prerequisites() {
     log_success "すべての必要なツールが確認されました"
 }
 
+# env.shの自動読み込み（条件付き）
+load_env_if_needed() {
+    if [ -f "env.sh" ]; then
+        if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            log_info "env.sh を自動的に読み込みます..."
+            source env.sh
+        else
+            log_info "環境変数が既に設定されています。env.sh の自動読み込みをスキップします。"
+            log_info "env.sh を読み込む場合は手動で 'source env.sh' を実行してください。"
+        fi
+    fi
+}
+
 # ROSA CLIのログイン確認
 ensure_rosa_auth() {
     log_info "ROSA認証状態の確認中..."
@@ -511,6 +524,9 @@ main() {
     
     # ステップ1: 前提条件の確認
     check_prerequisites
+    
+    # ステップ1.5: env.shの自動読み込み（必要な場合）
+    load_env_if_needed
     
     # ステップ2: ROSA認証の確認
     ensure_rosa_auth

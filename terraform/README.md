@@ -77,17 +77,78 @@ terraform output -json ansible_inventory_json
 
 ### terraform.tfvars の使用（オプション）
 
-環境変数をオーバーライドしたい場合のみ、`terraform.tfvars` を使用：
+`terraform.tfvars` は主に以下の2つの目的で使用されます：
+
+#### 1. 複雑な構造の設定
+
+環境変数では設定が困難な複雑な構造（リスト、オブジェクト、ネスト構造）を設定する場合：
 
 ```bash
-cp terraform.tfvars.example terraform.tfvars
-vim terraform.tfvars
+cp terraform/cluster/terraform.tfvars.example terraform/cluster/terraform.tfvars
+vim terraform/cluster/terraform.tfvars
 ```
 
-**優先順位**:
+**主な用途**:
+- `additional_machine_pools`: GPU プールなどの追加 MachinePool を定義
+- `tags`: 複雑なマップ構造（環境変数でも JSON 形式で設定可能）
+
+#### 2. ネットワークモジュールの出力（自動設定）
+
+`deploy.sh` が自動的にネットワークモジュールの出力を `terraform.tfvars` に設定します。
+手動で設定する必要はありません。
+
+**自動設定される変数**:
+- `vpc_id`
+- `public_subnet_ids`
+- `private_subnet_ids`
+- `availability_zones`
+
+### シンプルな変数の設定方法
+
+文字列や数値などのシンプルな変数は、**環境変数（`env.sh`）で設定してください**。
+`terraform.tfvars` に設定する必要はありません。
+
+**変数の優先順位**:
 1. `terraform.tfvars` で指定した値（最優先）
-2. `TF_VAR_*` 環境変数
-3. `variables.tf` のデフォルト値
+2. `TF_VAR_*` 環境変数（`env.sh` で設定）
+3. `variables.tf` のデフォルト値（最低優先度）
+
+**推奨される使い分け**:
+- **`env.sh`**: シンプルな変数（文字列、数値、真偽値）や機密情報
+- **`terraform.tfvars`**: 複雑な構造（`additional_machine_pools` など）や、`deploy.sh` が自動設定するネットワーク情報
+- **デフォルト値**: 標準的な設定で問題ない場合
+
+**例: `env.sh` で設定（推奨）**
+
+```bash
+# env.sh に追加
+export TF_VAR_aws_region="us-east-1"
+export TF_VAR_cluster_name="my-custom-cluster"
+export TF_VAR_ocp_version="4.20"
+export TF_VAR_rosa_machine_type="m6a.4xlarge"
+export TF_VAR_rosa_replicas="3"
+export TF_VAR_vpc_cidr="192.168.0.0/16"
+export TF_VAR_availability_zone_count="3"
+export TF_VAR_create_admin_user="false"
+```
+
+**例: `terraform.tfvars` で設定（複雑な構造の場合）**
+
+```hcl
+# terraform/cluster/terraform.tfvars
+additional_machine_pools = [
+  {
+    name          = "gpu-pool"
+    instance_type = "g6e.12xlarge"
+    replicas      = 1
+    labels = {
+      "node-role.kubernetes.io/gpu" = ""
+      "workload-type"               = "ai"
+    }
+    taints = []
+  }
+]
+```
 
 ## セキュリティのベストプラクティス
 

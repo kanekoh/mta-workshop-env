@@ -5,23 +5,28 @@
 # export TF_VAR_ocp_version="4.19"
 # export TF_VAR_billing_account="YOUR_BILLING_ACCOUNT_ID"
 
-# Network outputs from network module (must be set after network deployment)
-# These values should be obtained from terraform/network outputs
-vpc_id              = "vpc-xxxxxxxxx"  # From network module output
-public_subnet_ids   = ["subnet-xxxxx", "subnet-yyyyy"]  # From network module output
-private_subnet_ids  = ["subnet-zzzzz", "subnet-wwwww"]  # From network module output
-availability_zones  = ["ap-northeast-1a"]  # From network module output
-
-aws_region          = "ap-northeast-1"
-cluster_name        = "mta-lightspeed"
-vpc_cidr            = "10.0.0.0/16"
-ocp_version         = "4.19"
-rosa_machine_type   = "m6a.2xlarge"
-rosa_replicas       = 2
-availability_zone_count = 1
-
-# Admin User
-create_admin_user = true
+# ============================================================================
+# terraform.tfvars の用途
+# ============================================================================
+# terraform.tfvars は複雑な構造（additional_machine_pools など）を設定するために使用します。
+# 環境変数では設定が困難な複雑な構造（リスト、オブジェクト、ネスト構造）を設定します。
+#
+# ネットワークモジュールの出力は network-outputs.auto.tfvars に自動生成されます。
+# Terraformは *.auto.tfvars ファイルを自動的に読み込みます。
+#
+# シンプルな変数（文字列、数値）は env.sh で設定してください。
+# 例: env.sh で設定
+#   export TF_VAR_aws_region="us-east-1"
+#   export TF_VAR_cluster_name="my-custom-cluster"
+#   export TF_VAR_ocp_version="4.20"
+#   export TF_VAR_rosa_machine_type="m6a.4xlarge"
+#   export TF_VAR_rosa_replicas="3"
+#
+# ============================================================================
+# 必須設定: ネットワークモジュールの出力
+# ============================================================================
+# 以下の変数は deploy.sh が自動的に設定します。
+# 手動で設定する必要はありません（deploy.sh 実行後に自動的に追加されます）。
 
 # Cluster Admin User (optional - if not specified, module defaults will be used)
 # cluster_admin_username = "cluster-admin"

@@ -28,6 +28,7 @@ output "cluster_domain" {
 output "cluster_admin_username" {
   description = "Cluster admin username"
   value       = var.create_admin_user ? module.rosa_hcp.cluster_admin_username : "N/A"
+  sensitive   = true
 }
 
 output "cluster_admin_password" {

@@ -4,13 +4,43 @@
 # export TF_VAR_cluster_name="mta-lightspeed"
 # export TF_VAR_vpc_cidr="10.0.0.0/16"
 # export TF_VAR_availability_zone_count="1"
-
-aws_region              = "ap-northeast-1"
-cluster_name            = "mta-lightspeed"
-vpc_cidr                = "10.0.0.0/16"
-availability_zone_count = 1
-
-# Tags
+#
+# ============================================================================
+# terraform.tfvars の用途
+# ============================================================================
+# terraform.tfvars は主に複雑な構造（マップ、オブジェクト）を設定するために使用します。
+# シンプルな変数（文字列、数値）は環境変数（env.sh）で設定してください。
+#
+# 変数の優先順位:
+# 1. terraform.tfvars で指定した値（最優先）
+# 2. TF_VAR_* 環境変数（env.sh で設定）
+# 3. variables.tf のデフォルト値（最低優先度）
+#
+# ============================================================================
+# シンプルな変数の設定方法
+# ============================================================================
+# 以下の変数は variables.tf にデフォルト値が設定されています。
+# デフォルト値と異なる値が必要な場合は、env.sh で環境変数として設定してください。
+#
+# 例: env.sh で設定
+#   export TF_VAR_aws_region="us-east-1"
+#   export TF_VAR_cluster_name="my-custom-cluster"
+#   export TF_VAR_vpc_cidr="192.168.0.0/16"
+#   export TF_VAR_availability_zone_count="3"
+#
+# ============================================================================
+# カスタムタグの設定例
+# ============================================================================
+# Tags は複雑な構造（マップ）のため、terraform.tfvars で設定するか、
+# 環境変数で JSON 形式で設定します。
+#
+# 方法1: env.sh で環境変数として設定（推奨）
+#   export TF_VAR_tags='{"Environment":"Workshop","Project":"MTA-for-Developer-Lightspeed","Owner":"Your Name"}'
+#
+# 方法2: terraform.tfvars で設定
+#   Tags の Environment と Project は variables.tf のデフォルト値と同じため、
+#   Owner などの追加タグのみ設定する場合は、Environment と Project も含める必要があります
+#   (Terraformでは tags 変数を設定するとデフォルト値が完全に上書きされます)
 tags = {
   Environment = "Workshop"
   Project     = "MTA-for-Developer-Lightspeed"
