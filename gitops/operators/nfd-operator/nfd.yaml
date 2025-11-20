@@ -9,6 +9,7 @@ metadata:
   operand:
     imagePullPolicy: IfNotPresent
     servicePort: 12000
+spec:
   workerConfig:
     configData: |
       core:
