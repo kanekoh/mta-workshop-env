@@ -205,7 +205,28 @@ ensure_rosa_auth() {
 get_cluster_name() {
     local cluster_name=""
     
-    cd terraform/cluster
+    # プロジェクトルートに移動
+    pushd "$SCRIPT_DIR" > /dev/null || {
+        log_error "プロジェクトルートに移動できませんでした"
+        echo "mta-lightspeed"
+        return 1
+    }
+    
+    # terraform/clusterディレクトリが存在するか確認
+    if [ ! -d "terraform/cluster" ]; then
+        log_warning "terraform/cluster ディレクトリが見つかりません。環境変数からクラスター名を取得します。"
+        cluster_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+        popd > /dev/null
+        echo "$cluster_name"
+        return 0
+    fi
+    
+    pushd terraform/cluster > /dev/null || {
+        log_error "terraform/cluster に移動できませんでした"
+        popd > /dev/null
+        echo "mta-lightspeed"
+        return 1
+    }
     
     # 方法1: Terraform outputから取得
     if terraform output -raw cluster_name > /dev/null 2>&1; then
@@ -227,7 +248,9 @@ get_cluster_name() {
         cluster_name="mta-lightspeed"
     fi
     
-    cd ../..
+    # スタックを2つ戻す（terraform/cluster → SCRIPT_DIR → 元のディレクトリ）
+    popd > /dev/null
+    popd > /dev/null
     echo "$cluster_name"
 }
 
@@ -285,13 +308,32 @@ destroy_cluster() {
     log_info "フェーズ1: ROSAクラスターの削除"
     log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    cd terraform/cluster
+    # プロジェクトルートに移動
+    pushd "$SCRIPT_DIR" > /dev/null || {
+        log_error "プロジェクトルートに移動できませんでした"
+        return 1
+    }
+    
+    # terraform/clusterディレクトリが存在するか確認
+    if [ ! -d "terraform/cluster" ]; then
+        log_warning "terraform/cluster ディレクトリが見つかりません。"
+        log_info "既に削除済みの可能性があります。"
+        popd > /dev/null
+        return 0
+    fi
+    
+    pushd terraform/cluster > /dev/null || {
+        log_error "terraform/cluster に移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
     
     # Terraform状態ファイルの確認
     if [ ! -f "terraform.tfstate" ] && [ ! -f ".terraform/terraform.tfstate" ]; then
         log_warning "Terraform状態ファイルが見つかりません"
         log_info "既に削除済みの可能性があります"
-        cd ../..
+        popd > /dev/null  # terraform/clusterから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         return 0
     fi
     
@@ -353,7 +395,9 @@ destroy_cluster() {
     log_info "次のステップで rosa コマンドでクラスター削除の完了を確認します"
     echo ""
     
-    cd ../..
+    # スタックを2つ戻す（terraform/cluster → SCRIPT_DIR → 元のディレクトリ）
+    popd > /dev/null
+    popd > /dev/null
 }
 
 # フェーズ2: ネットワークリソースの削除
@@ -362,13 +406,24 @@ destroy_network() {
     log_info "フェーズ2: ネットワークリソースの削除"
     log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    cd terraform/network
+    # プロジェクトルートに移動
+    pushd "$SCRIPT_DIR" > /dev/null || {
+        log_error "プロジェクトルートに移動できませんでした"
+        return 1
+    }
+    
+    pushd terraform/network > /dev/null || {
+        log_error "terraform/network に移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
     
     # Terraform状態ファイルの確認
     if [ ! -f "terraform.tfstate" ] && [ ! -f ".terraform/terraform.tfstate" ]; then
         log_warning "Terraform状態ファイルが見つかりません"
         log_info "既に削除済みの可能性があります"
-        cd ../..
+        popd > /dev/null  # terraform/networkから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         return 0
     fi
     
@@ -382,7 +437,8 @@ destroy_network() {
         if terraform destroy -auto-approve 2>&1 | tee /tmp/terraform_destroy.log; then
             log_success "ネットワークリソースの削除が完了しました！"
             echo ""
-            cd ../..
+            popd > /dev/null  # terraform/networkから戻る
+            popd > /dev/null  # SCRIPT_DIRから戻る
             return 0
         else
             RETRY_COUNT=$((RETRY_COUNT + 1))
@@ -393,9 +449,13 @@ destroy_network() {
                 
                 if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
                     log_info "ENIのクリーンアップを待機してから再試行します..."
-                    cd ../..
+                    popd > /dev/null  # terraform/networkから戻る
                     wait_for_eni_cleanup
-                    cd terraform/network
+                    pushd terraform/network > /dev/null || {
+                        log_error "terraform/network に再移動できませんでした"
+                        popd > /dev/null
+                        return 1
+                    }
                     sleep 10  # 追加の待機時間
                 else
                     log_error "最大再試行回数に達しました"
@@ -411,18 +471,21 @@ destroy_network() {
                     echo "  # 必要に応じてENIを削除（注意: 他のリソースで使用中のENIは削除できません）"
                     echo "  # aws ec2 delete-network-interface --network-interface-id <eni-id>"
                     echo ""
-                    cd ../..
+                    popd > /dev/null  # terraform/networkから戻る
+                    popd > /dev/null  # SCRIPT_DIRから戻る
                     return 1
                 fi
             else
                 log_error "予期しないエラーが発生しました"
-                cd ../..
+                popd > /dev/null  # terraform/networkから戻る
+                popd > /dev/null  # SCRIPT_DIRから戻る
                 return 1
             fi
         fi
     done
     
-    cd ../..
+    popd > /dev/null  # terraform/networkから戻る
+    popd > /dev/null  # SCRIPT_DIRから戻る
     return 1
 }
 
@@ -477,9 +540,14 @@ wait_for_eni_cleanup() {
     log_info "VPC内のENI（Elastic Network Interface）のクリーンアップを待機中..."
     
     # VPC IDを取得
-    cd terraform/network
+    pushd "$SCRIPT_DIR" > /dev/null || return 1
+    pushd terraform/network > /dev/null || {
+        popd > /dev/null
+        return 1
+    }
     VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
-    cd ../..
+    popd > /dev/null  # terraform/networkから戻る
+    popd > /dev/null  # SCRIPT_DIRから戻る
     
     if [ -z "$VPC_ID" ]; then
         log_warning "VPC IDを取得できませんでした。ENIクリーンアップの待機をスキップします"

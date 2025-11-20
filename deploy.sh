@@ -251,7 +251,17 @@ deploy_network() {
     log_info "フェーズ1: ネットワークリソースの構築"
     log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    cd terraform/network
+    # プロジェクトルートに移動
+    pushd "$SCRIPT_DIR" > /dev/null || {
+        log_error "プロジェクトルートに移動できませんでした"
+        return 1
+    }
+    
+    pushd terraform/network > /dev/null || {
+        log_error "terraform/network に移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
     
     # terraform.tfvarsが存在しない場合は作成を促す
     if [ ! -f "terraform.tfvars" ]; then
@@ -259,7 +269,8 @@ deploy_network() {
         log_info "terraform.tfvars.exampleからコピーして設定してください"
         cp terraform.tfvars.example terraform.tfvars
         log_error "terraform.tfvarsを編集してから再度実行してください"
-        cd ../..
+        popd > /dev/null  # terraform/networkから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         exit 1
     fi
     
@@ -282,7 +293,8 @@ deploy_network() {
         echo "VPC CIDR: $(terraform output -raw vpc_cidr 2>/dev/null || echo "N/A")"
         echo "Public Subnets: $(terraform output -json public_subnet_ids 2>/dev/null | jq -r 'join(", ")' || echo "N/A")"
         echo "Private Subnets: $(terraform output -json private_subnet_ids 2>/dev/null | jq -r 'join(", ")' || echo "N/A")"
-        cd ../..
+        popd > /dev/null  # terraform/networkから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         return 0
     fi
     
@@ -300,7 +312,8 @@ deploy_network() {
     echo "Public Subnets: $(terraform output -json public_subnet_ids | jq -r 'join(", ")')"
     echo "Private Subnets: $(terraform output -json private_subnet_ids | jq -r 'join(", ")')"
     
-    cd ../..
+    popd > /dev/null  # terraform/networkから戻る
+    popd > /dev/null  # SCRIPT_DIRから戻る
 }
 
 # フェーズ2: ROSAクラスターのデプロイ
@@ -309,11 +322,19 @@ deploy_cluster() {
     log_info "フェーズ2: ROSAクラスターの構築"
     log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    cd terraform/cluster
+    # プロジェクトルートに移動
+    pushd "$SCRIPT_DIR" > /dev/null || {
+        log_error "プロジェクトルートに移動できませんでした"
+        return 1
+    }
     
     # ネットワークモジュールの出力を取得
     log_info "ネットワークモジュールの出力を取得中..."
-    cd ../network
+    pushd terraform/network > /dev/null || {
+        log_error "terraform/network に移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
     VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
     VPC_CIDR=$(terraform output -raw vpc_cidr 2>/dev/null || echo "")
     
@@ -333,11 +354,18 @@ deploy_cluster() {
     if [ -z "$VPC_ID" ] || [ -z "$PUBLIC_SUBNET_IDS" ] || [ -z "$PRIVATE_SUBNET_IDS" ]; then
         log_error "ネットワークモジュールの出力を取得できませんでした"
         log_error "先にネットワークモジュールをデプロイしてください"
-        cd ../..
+        popd > /dev/null  # terraform/networkから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         exit 1
     fi
     
-    cd ../cluster
+    # terraform/networkから戻って、terraform/clusterに移動
+    popd > /dev/null  # terraform/networkから戻る（SCRIPT_DIRに戻る）
+    pushd terraform/cluster > /dev/null || {
+        log_error "terraform/cluster に移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
     
     # terraform.tfvarsが存在しない場合は作成
     if [ ! -f "terraform.tfvars" ]; then
@@ -386,7 +414,8 @@ EOF
         mkdir -p ../../ansible
         terraform output -raw ansible_inventory_json > ../../ansible/cluster_info.json
         
-        cd ../..
+        popd > /dev/null  # terraform/clusterから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         return 0
     fi
     
@@ -420,7 +449,8 @@ EOF
     mkdir -p ../../ansible
     terraform output -raw ansible_inventory_json > ../../ansible/cluster_info.json
     
-    cd ../..
+    popd > /dev/null  # terraform/clusterから戻る
+    popd > /dev/null  # SCRIPT_DIRから戻る
 }
 
 # Ansibleによる追加設定
@@ -435,12 +465,23 @@ run_ansible() {
         return 0
     fi
     
-    cd ansible
+    # プロジェクトルートに移動
+    pushd "$SCRIPT_DIR" > /dev/null || {
+        log_error "プロジェクトルートに移動できませんでした"
+        return 1
+    }
+    
+    pushd ansible > /dev/null || {
+        log_error "ansible ディレクトリに移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
     
     # cluster_info.jsonが存在するか確認
     if [ ! -f "cluster_info.json" ]; then
         log_warning "cluster_info.jsonが見つかりません。Ansible実行をスキップします"
-        cd ..
+        popd > /dev/null  # ansibleから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         return 0
     fi
     
@@ -454,11 +495,13 @@ run_ansible() {
     log_info "Ansible playbookを実行中..."
     if ansible-playbook playbooks/site.yml; then
         log_success "Ansible playbookの実行が完了しました"
-        cd ..
+        popd > /dev/null  # ansibleから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         return 0
     else
         log_error "Ansible playbookの実行に失敗しました"
-        cd ..
+        popd > /dev/null  # ansibleから戻る
+        popd > /dev/null  # SCRIPT_DIRから戻る
         return 1
     fi
 }
@@ -467,12 +510,24 @@ run_ansible() {
 verify_cluster_access() {
     log_info "クラスターへのアクセスを確認中..."
     
-    cd terraform/cluster
+    # プロジェクトルートに移動
+    pushd "$SCRIPT_DIR" > /dev/null || {
+        log_error "プロジェクトルートに移動できませんでした"
+        return 1
+    }
+    
+    pushd terraform/cluster > /dev/null || {
+        log_error "terraform/cluster に移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
     
     CLUSTER_API=$(terraform output -raw cluster_api_url 2>/dev/null || echo "")
     ADMIN_USER=$(terraform output -raw cluster_admin_username 2>/dev/null || echo "")
     ADMIN_PASS=$(terraform output -raw cluster_admin_password 2>/dev/null || echo "")
-    cd ../..
+    
+    popd > /dev/null  # terraform/clusterから戻る
+    popd > /dev/null  # SCRIPT_DIRから戻る
     
     if [ -z "$CLUSTER_API" ] || [ -z "$ADMIN_USER" ] || [ -z "$ADMIN_PASS" ]; then
         log_warning "クラスター情報がまだ利用できません"
@@ -556,12 +611,17 @@ main() {
     echo ""
     
     # クラスター情報を取得して表示
-    cd terraform/cluster
+    pushd "$SCRIPT_DIR" > /dev/null || return 1
+    pushd terraform/cluster > /dev/null || {
+        popd > /dev/null
+        return 1
+    }
     CLUSTER_API=$(terraform output -raw cluster_api_url 2>/dev/null || echo "")
     CONSOLE_URL=$(terraform output -raw cluster_console_url 2>/dev/null || echo "")
     ADMIN_USER=$(terraform output -raw cluster_admin_username 2>/dev/null || echo "")
     ADMIN_PASS=$(terraform output -raw cluster_admin_password 2>/dev/null || echo "")
-    cd ../..
+    popd > /dev/null  # terraform/clusterから戻る
+    popd > /dev/null  # SCRIPT_DIRから戻る
     
     log_info "次のステップ："
     echo ""
