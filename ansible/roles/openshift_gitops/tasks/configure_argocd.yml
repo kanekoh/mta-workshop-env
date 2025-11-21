@@ -13,6 +13,24 @@
         labels:
           openshift.io/cluster-monitoring: "true"
 
+- name: Grant cluster-admin permissions to ArgoCD Application Controller ServiceAccount
+  kubernetes.core.k8s:
+    name: argocd-application-controller-cluster-admin
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    state: present
+    definition:
+      metadata:
+        name: argocd-application-controller-cluster-admin
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+      - kind: ServiceAccount
+        name: openshift-gitops-argocd-application-controller
+        namespace: "{{ openshift_gitops.argocd_namespace }}"
+
 - name: Create AppOfApps Application (monitors gitops/apps directory)
   kubernetes.core.k8s:
     name: "{{ openshift_gitops.app_of_apps.name }}"

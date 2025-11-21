@@ -1,17 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: nvidia-operator
+  name: devspaces
   namespace: openshift-gitops
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "2"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  # NFD OperatorがHealthyになるまで待機
-  dependsOn:
-    - name: nfd-operator
   syncPolicy:
     automated:
       prune: true
@@ -22,7 +19,7 @@ spec:
   source:
     repoURL: https://github.com/kanekoh/mta-workshop-env.git
     targetRevision: main
-    path: gitops/operators/nvidia-operator
+    path: gitops/operators/devspaces
   destination:
-    namespace: nvidia-gpu-operator
+    namespace: openshift-operators
     server: https://kubernetes.default.svc

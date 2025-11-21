@@ -1,0 +1,18 @@
+apiVersion: org.eclipse.che/v2
+kind: CheCluster
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: devspaces
+  namespace: openshift-operators 
+spec:
+  components: 
+    cheServer:
+      extraProperties:
+        CHE_INFRA_KUBERNETES_NAMESPACE_LABELS: >-
+          app.kubernetes.io/part-of=che.eclipse.org,app.kubernetes.io/component=workspaces-namespace,mta.workshop=true
+  containerRegistry: {}
+  devEnvironments:
+    secondsOfInactivityBeforeIdling: -1
+  gitServices: {}
+  networking: {}
