@@ -327,6 +327,58 @@ cd ../ansible
 ansible-playbook site.yml
 ```
 
+### 4. GitOps環境の切り替え
+
+このスクリプトは、1つのスクリプトで複数のGitOps環境に対応できます。環境を切り替えるには、`env.sh`で`GITOPS_ENV`環境変数を設定します。
+
+#### 環境の種類
+
+- **mta** (デフォルト): MTA for Developer Lightspeedワークショップ用の環境
+- **other**: その他のカスタム環境
+
+#### 使用方法
+
+1. **環境変数の設定** (`env.sh`):
+
+```bash
+# MTA環境を使用（デフォルト）
+export GITOPS_ENV="mta"
+
+# または、その他の環境を使用
+export GITOPS_ENV="other"
+```
+
+2. **デプロイスクリプトの実行**:
+
+```bash
+source env.sh
+./deploy.sh
+```
+
+`deploy.sh`は自動的に`GITOPS_ENV`を読み込み、Ansibleに渡します。Ansibleは`gitops/environments/{GITOPS_ENV}/apps/`ディレクトリを監視するようにArgoCDのapp-of-appsを設定します。
+
+#### ディレクトリ構造
+
+```
+gitops/
+└── environments/
+    ├── mta/
+    │   └── apps/          # MTA用のApplication定義
+    └── other/
+        └── apps/          # その他用のApplication定義
+```
+
+#### 新しい環境の追加
+
+新しい環境を追加する場合：
+
+1. `gitops/environments/{env-name}/apps/` ディレクトリを作成
+2. そのディレクトリにApplication定義ファイル（`*.yml`）を配置
+3. `env.sh`で`GITOPS_ENV="{env-name}"`を設定
+4. `./deploy.sh`を実行
+
+**注意**: 環境名に対応するディレクトリが`gitops/environments/{GITOPS_ENV}/apps/`に存在する必要があります。
+
 ## 環境の削除
 
 環境を削除する場合は、削除スクリプトを使用することを推奨します：
@@ -421,7 +473,11 @@ rosa logs install -c mta-lightspeed --watch
 │   ├── playbooks/
 │   └── roles/
 └── gitops/                       # GitOps設定
-    └── argocd/
+    └── environments/            # 環境別のApplication定義
+        ├── mta/                 # MTA環境
+        │   └── apps/            # Application定義ファイル
+        └── other/                # その他の環境（例）
+            └── apps/             # Application定義ファイル
 ```
 
 ### 2フェーズ構成の理由

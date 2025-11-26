@@ -18,7 +18,9 @@ openshift_gitops:
   gitops_repo:
     url: https://github.com/kanekoh/mta-workshop-env.git
     branch: main
-    path: gitops/apps  # App of Apps will monitor this directory
+    # Environment-specific path (default: mta)
+    # Set via Ansible variable: -e gitops_env={GITOPS_ENV}
+    path: "gitops/environments/{{ gitops_env | default('mta') }}/apps"
   
   # App of Apps Configuration
   app_of_apps:

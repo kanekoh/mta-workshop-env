@@ -577,9 +577,13 @@ run_ansible() {
         ansible-galaxy collection install -r requirements.yml
     fi
     
+    # GitOps環境の設定（デフォルト: mta）
+    GITOPS_ENV="${GITOPS_ENV:-mta}"
+    log_info "GitOps環境: ${GITOPS_ENV}"
+    
     # Ansible playbook実行
     log_info "Ansible playbookを実行中..."
-    if ansible-playbook playbooks/site.yml; then
+    if ansible-playbook playbooks/site.yml -e "gitops_env=${GITOPS_ENV}"; then
         log_success "Ansible playbookの実行が完了しました"
         popd > /dev/null  # ansibleから戻る
         popd > /dev/null  # SCRIPT_DIRから戻る
