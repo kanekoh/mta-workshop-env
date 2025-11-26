@@ -36,3 +36,5 @@
     
 - import_playbook: install_gitops.yml
 
+- import_playbook: install_rhacm.yml
+

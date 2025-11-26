@@ -1,0 +1,17 @@
+---
+# Main tasks file for RHACM role
+- name: Install RHACM Operator
+  include_tasks: install_operator.yml
+
+- name: Wait for Operator to be ready
+  include_tasks: wait_operator.yml
+
+- name: Configure Hub cluster
+  include_tasks: configure_hub.yml
+
+- name: Configure Policies
+  include_tasks: configure_policies.yml
+
+- name: Configure DevSpaces AWS Role ARN
+  include_tasks: configure_devspaces_role.yml
+

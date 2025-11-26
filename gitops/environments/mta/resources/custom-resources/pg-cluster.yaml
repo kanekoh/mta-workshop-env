@@ -1,0 +1,20 @@
+kind: Cluster
+apiVersion: postgresql.cnpg.io/v1
+metadata:
+  name: postgres
+  namespace: keycloak
+spec:
+  bootstrap:
+    initdb:
+      # Keycloakが使うDB名
+      database: keycloak
+      postInitSQL:
+        - "CREATE SCHEMA IF NOT EXISTS keycloak AUTHORIZATION keycloak;"
+        - "ALTER ROLE keycloak SET search_path = keycloak;"
+  instances: 1
+  logLevel: info
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 1Gi
+  walStorage:
+    size: 1Gi

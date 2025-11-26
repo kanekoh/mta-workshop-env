@@ -5,8 +5,9 @@
 ## 概要
 
 - **Terraform**: Red Hat OpenShift for AWS (ROSA) HCP クラスターの構築
-- **Ansible**: OpenShift IDP設定、ArgoCD構築などの構成管理
-- **GitOps**: 継続的デリバリーとアプリケーションデプロイ
+- **Ansible**: OpenShift IDP設定、ArgoCD構築、RHACM構築などの構成管理
+- **RHACM**: Operatorのインストールと管理（PolicyGeneratorを使用）
+- **GitOps (ArgoCD)**: アプリケーションと環境固有リソースの継続的デリバリー
 
 ## 前提条件
 
@@ -319,7 +320,8 @@ TerraformでROSAクラスターが構築された後、Ansibleを使用して以
 
 - htpasswd Identity Provider の設定
 - ワークショップユーザーの作成
-- ArgoCD のインストールと設定
+- OpenShift GitOps (ArgoCD) のインストールと設定
+- Red Hat Advanced Cluster Management (RHACM) のインストールと設定
 - その他のワークショップ環境の準備
 
 ```bash
@@ -327,7 +329,40 @@ cd ../ansible
 ansible-playbook site.yml
 ```
 
-### 4. GitOps環境の切り替え
+### 4. RHACMによるOperator管理
+
+このプロジェクトでは、Red Hat Advanced Cluster Management (RHACM) のPolicyGeneratorを使用して、すべてのOperatorを管理します。
+
+#### Operator管理の棲み分け
+
+- **RHACM**: インフラレベルのOperatorのインストールと管理
+  - NFD Operator
+  - NVIDIA GPU Operator
+  - OpenShift AI Operator
+  - Authorino Operator
+  - DevSpaces Operator
+  - Cloud Native PostgreSQL Operator
+  - Red Hat build of Keycloak Operator
+
+- **ArgoCD**: アプリケーションと環境固有リソースの管理
+  - `gitops/environments/{env-name}/resources/` 配下のリソース
+  - 環境ごとに異なる設定やカスタムリソース
+
+#### RHACMの設定
+
+RHACMはAnsible playbook実行時に自動的にインストールされ、PolicyGenerator定義に基づいてOperatorが管理されます。
+
+PolicyGenerator定義は `rhacm/policies/operators/` ディレクトリに配置され、Operatorマニフェストは `rhacm/manifests/operators/` ディレクトリに配置されます。
+
+詳細は `rhacm/policies/README.md` を参照してください。
+
+#### DevSpaces用AWS Role ARNの設定
+
+DevSpaces OperatorのインストールにはAWS IAM Role ARNが必要です。`deploy.sh`は自動的にTerraform outputからRole ARNを取得し、`rhacm/manifests/operators/devspaces/subs.yml`に設定します。
+
+Role ARNの形式: `arn:aws:iam::{account_id}:role/{cluster_name}-operator-roles-devspaces`
+
+### 5. GitOps環境の切り替え
 
 このスクリプトは、1つのスクリプトで複数のGitOps環境に対応できます。環境を切り替えるには、`env.sh`で`GITOPS_ENV`環境変数を設定します。
 
@@ -360,22 +395,67 @@ source env.sh
 #### ディレクトリ構造
 
 ```
+rhacm/
+├── policies/
+│   └── operators/                # PolicyGenerator定義
+│       ├── nfd-operator-policygenerator.yaml
+│       ├── nvidia-operator-policygenerator.yaml
+│       └── ...
+└── manifests/
+    └── operators/                 # Operatorマニフェスト
+        ├── nfd-operator/
+        ├── nvidia-operator/
+        └── ...
+
 gitops/
 └── environments/
     ├── mta/
-    │   └── apps/          # MTA用のApplication定義
+    │   ├── apps/                # Application定義
+    │   ├── operators/           # 環境専用Operator（オプション）
+    │   └── resources/           # 環境専用リソース
+    │       ├── configmaps/      # ConfigMap
+    │       ├── secrets/         # Secret（機密情報）
+    │       └── custom-resources/ # カスタムリソース
     └── other/
-        └── apps/          # その他用のApplication定義
+        ├── apps/
+        ├── operators/           # オプション
+        └── resources/           # 環境専用リソース
 ```
+
+#### 環境専用リソースの使用
+
+環境ごとに異なるリソース（ConfigMap、Secret、カスタムリソースなど）が必要な場合は、`gitops/environments/{env-name}/resources/` ディレクトリに配置します。
+
+**例: 環境専用リソースをデプロイするApplication定義**
+
+`gitops/environments/mta/apps/custom-resources.yml`:
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mta-custom-resources
+  namespace: openshift-gitops
+spec:
+  source:
+    repoURL: https://github.com/kanekoh/mta-workshop-env.git
+    targetRevision: main
+    path: gitops/environments/mta/resources/custom-resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: your-namespace
+```
+
+詳細は `gitops/environments/{env-name}/resources/README.md` を参照してください。
 
 #### 新しい環境の追加
 
 新しい環境を追加する場合：
 
 1. `gitops/environments/{env-name}/apps/` ディレクトリを作成
-2. そのディレクトリにApplication定義ファイル（`*.yml`）を配置
-3. `env.sh`で`GITOPS_ENV="{env-name}"`を設定
-4. `./deploy.sh`を実行
+2. `gitops/environments/{env-name}/resources/` ディレクトリを作成（環境専用リソース用）
+3. そのディレクトリにApplication定義ファイル（`*.yml`）を配置
+4. `env.sh`で`GITOPS_ENV="{env-name}"`を設定
+5. `./deploy.sh`を実行
 
 **注意**: 環境名に対応するディレクトリが`gitops/environments/{GITOPS_ENV}/apps/`に存在する必要があります。
 
@@ -472,12 +552,27 @@ rosa logs install -c mta-lightspeed --watch
 │   ├── inventory/
 │   ├── playbooks/
 │   └── roles/
-└── gitops/                       # GitOps設定
-    └── environments/            # 環境別のApplication定義
+│       ├── openshift_gitops/     # OpenShift GitOps (ArgoCD) ロール
+│       └── rhacm/                # RHACM ロール
+├── rhacm/                        # RHACM設定
+│   ├── policies/                 # PolicyGenerator定義
+│   │   └── operators/           # Operator用PolicyGenerator
+│   └── manifests/                # Operatorマニフェスト
+│       └── operators/            # Operator定義（Namespace, Subscription, CR等）
+└── gitops/                       # GitOps設定（ArgoCD用）
+    └── environments/             # 環境別設定
+    └── environments/            # 環境別の設定
         ├── mta/                 # MTA環境
-        │   └── apps/            # Application定義ファイル
+        │   ├── apps/            # Application定義ファイル
+        │   ├── operators/       # 環境専用Operator（オプション）
+        │   └── resources/       # 環境専用リソース
+        │       ├── configmaps/
+        │       ├── secrets/
+        │       └── custom-resources/
         └── other/                # その他の環境（例）
-            └── apps/             # Application定義ファイル
+            ├── apps/             # Application定義ファイル
+            ├── operators/        # オプション
+            └── resources/        # 環境専用リソース
 ```
 
 ### 2フェーズ構成の理由

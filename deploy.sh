@@ -535,6 +535,9 @@ EOF
         terraform output -raw ansible_inventory_json > ../../ansible/cluster_info.json
     fi
     
+    # DevSpaces用のAWS Role ARNはAnsibleで設定されます
+    log_info "DevSpaces用のAWS Role ARNはAnsible実行時に設定されます"
+    
     popd > /dev/null  # terraform/clusterから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
 }

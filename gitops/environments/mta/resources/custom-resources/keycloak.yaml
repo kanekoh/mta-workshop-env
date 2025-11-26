@@ -1,0 +1,27 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  ingress:
+    className: openshift-default
+  instances: 1
+  db:
+    vendor: postgres
+    host: postgres-rw
+    database: postgres
+    usernameSecret:
+      name: postgres-app
+      key: username
+    passwordSecret:
+      name: postgres-app
+      key: password
+  proxy:
+    headers: xforwarded 
+  http:
+    httpEnabled: true
+  hostname:
+    strict: false

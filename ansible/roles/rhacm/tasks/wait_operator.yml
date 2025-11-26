@@ -1,0 +1,46 @@
+---
+# Tasks for waiting for RHACM Operator to be ready
+
+- name: Wait for CSV (ClusterServiceVersion) to be created
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ rhacm.operator_namespace }}"
+    label_selectors:
+      - "operators.coreos.com/{{ rhacm.operator_name }}.{{ rhacm.operator_namespace }}"
+  register: csv_result
+  until: csv_result.resources | length > 0
+  retries: 30
+  delay: 10
+  failed_when: false
+
+- name: Wait for CSV to be in Succeeded phase
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ rhacm.operator_namespace }}"
+    name: "{{ csv_result.resources[0].metadata.name }}"
+  register: csv_status
+  until: csv_status.resources[0].status.phase == "Succeeded"
+  retries: 60
+  delay: 15
+
+- name: Display CSV status
+  debug:
+    msg: "RHACM Operator CSV is in {{ csv_status.resources[0].status.phase }} phase"
+
+- name: Wait for RHACM namespace to be created
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: "{{ rhacm.namespace }}"
+  register: rhacm_namespace
+  until: rhacm_namespace.resources | length > 0
+  retries: 20
+  delay: 10
+  failed_when: false
+
+- name: Display RHACM namespace status
+  debug:
+    msg: "RHACM namespace {{ rhacm.namespace }} {{ 'exists' if rhacm_namespace.resources | length > 0 else 'not yet created' }}"
+

@@ -1,0 +1,24 @@
+---
+# Playbook for installing RHACM Operator
+- name: Install RHACM Operator
+  hosts: openshift
+  gather_facts: true
+  
+  tasks:
+    - name: Verify cluster connection
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: default
+      register: cluster_connection
+      failed_when: false
+    
+    - name: Fail if cluster is not accessible
+      fail:
+        msg: "Cannot connect to OpenShift cluster. Please ensure you are logged in with 'oc login'."
+      when: cluster_connection.failed | default(true)
+    
+    - name: Install RHACM Operator
+      include_role:
+        name: rhacm
+
