@@ -4,7 +4,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   name: devspaces
-  namespace: openshift-operators 
+  namespace: openshift-devspaces
 spec:
   components: 
     cheServer:
