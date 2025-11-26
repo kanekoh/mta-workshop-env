@@ -8,7 +8,7 @@ metadata:
 spec:
   channel: "stable-v26"
   installPlanApproval: Automatic
-  name: keycloak-operator
+  name: rhbk-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 
