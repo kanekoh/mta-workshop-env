@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
-  channel: "stable-v1.26"
+  channel: "stable-v1"
   installPlanApproval: Automatic
   name: cloudnative-pg
   source: certified-operators
