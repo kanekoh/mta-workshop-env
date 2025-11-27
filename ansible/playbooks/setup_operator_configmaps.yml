@@ -3,6 +3,8 @@
 - name: Setup Operator RoleARN ConfigMaps
   hosts: openshift
   gather_facts: true
+  vars:
+    cluster_info_file: "{{ playbook_dir }}/../cluster_info.json"
   
   tasks:
     - name: Verify cluster connection
@@ -18,18 +20,20 @@
         msg: "Cannot connect to OpenShift cluster. Please ensure you are logged in with 'oc login'."
       when: cluster_connection.failed | default(true)
     
-    - name: Get DevSpaces Role ARN from Terraform output
-      command: terraform output -raw devspaces_role_arn
-      args:
-        chdir: "{{ playbook_dir }}/../../terraform/cluster"
-      register: devspaces_role_arn_output
-      changed_when: false
+    - name: Load cluster information from cluster_info.json
+      set_fact:
+        cluster_info: "{{ lookup('file', cluster_info_file) | from_json }}"
+      when: cluster_info_file is defined
+      register: cluster_info_result
       failed_when: false
     
-    - name: Set DevSpaces Role ARN fact
+    - name: Set RoleARN facts from cluster_info
       set_fact:
-        devspaces_role_arn: "{{ devspaces_role_arn_output.stdout | default('') }}"
-      when: devspaces_role_arn_output.rc == 0
+        devspaces_role_arn: "{{ cluster_info.role_arns.devspaces | default('') }}"
+        cnpg_role_arn: "{{ cluster_info.role_arns.cnpg | default('') }}"
+      when: 
+        - cluster_info is defined
+        - cluster_info.role_arns is defined
     
     - name: Ensure openshift-devspaces namespace exists
       kubernetes.core.k8s:
@@ -54,7 +58,31 @@
             rolearn: "{{ devspaces_role_arn | default('') }}"
       when: devspaces_role_arn is defined
     
+    
+    - name: Ensure cnpg-system namespace exists
+      kubernetes.core.k8s:
+        name: cnpg-system
+        api_version: v1
+        kind: Namespace
+        state: present
+      when: cnpg_role_arn is defined
+    
+    - name: Create ConfigMap for CNPG RoleARN in cnpg-system namespace
+      kubernetes.core.k8s:
+        name: operator-rolearn
+        namespace: cnpg-system
+        api_version: v1
+        kind: ConfigMap
+        state: present
+        definition:
+          metadata:
+            name: operator-rolearn
+            namespace: cnpg-system
+          data:
+            rolearn: "{{ cnpg_role_arn | default('') }}"
+      when: cnpg_role_arn is defined
+    
     - name: Display ConfigMap creation status
       debug:
-        msg: "Operator RoleARN ConfigMap created in openshift-devspaces namespace. DevSpaces: {{ devspaces_role_arn | default('not configured') }}"
+        msg: "Operator RoleARN ConfigMaps created. DevSpaces: {{ devspaces_role_arn | default('not configured') }}, CNPG: {{ cnpg_role_arn | default('not configured') }}"
 

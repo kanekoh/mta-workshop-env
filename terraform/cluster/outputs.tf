@@ -69,6 +69,11 @@ output "devspaces_role_arn" {
   value       = data.aws_iam_user.admin_user.arn
 }
 
+output "cnpg_role_arn" {
+  description = "AWS IAM User ARN for CNPG Operator (alias for admin_user_arn)"
+  value       = data.aws_iam_user.admin_user.arn
+}
+
 # Ansible Inventory Output (JSON format)
 output "ansible_inventory_json" {
   description = "JSON output for Ansible inventory"
@@ -91,6 +96,10 @@ output "ansible_inventory_json" {
       vpc_cidr           = var.vpc_cidr
       public_subnet_ids  = var.public_subnet_ids
       private_subnet_ids = var.private_subnet_ids
+    }
+    role_arns = {
+      devspaces = data.aws_iam_user.admin_user.arn
+      cnpg      = data.aws_iam_user.admin_user.arn
     }
   })
   sensitive = true

@@ -11,4 +11,12 @@ spec:
   name: cloudnative-pg
   source: certified-operators
   sourceNamespace: openshift-marketplace
+  config:
+    env:
+    - name: ROLEARN
+      valueFrom:
+        configMapKeyRef:
+          name: operator-rolearn
+          key: rolearn
+
 
