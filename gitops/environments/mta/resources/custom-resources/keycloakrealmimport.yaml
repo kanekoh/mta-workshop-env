@@ -3,6 +3,7 @@
   "kind": "KeycloakRealmImport",
   "metadata": {
     "name": "eap-import",
+    "namespace": "keycloak",
     "annotations": {
       "argocd.argoproj.io/sync-options": "SkipDryRunOnMissingResource=true"
     }
