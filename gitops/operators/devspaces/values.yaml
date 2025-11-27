@@ -7,8 +7,8 @@ subscription:
   installPlanApproval: Automatic
   # RoleARN will be injected from ConfigMap via ApplicationSet
   # rolearnConfigMap will be set by ApplicationSet's Helm values
+  # ConfigMap must be in the same namespace as the Subscription (openshift-devspaces)
   # rolearnConfigMap:
-  #   name: operator-rolearns
-  #   namespace: openshift-gitops
-  #   key: devspaces-rolearn
+  #   name: operator-rolearn
+  #   key: rolearn
 

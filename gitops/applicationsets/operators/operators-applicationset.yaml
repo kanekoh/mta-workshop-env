@@ -82,9 +82,8 @@ spec:
           values: |
             subscription:
               rolearnConfigMap:
-                name: operator-rolearns
-                namespace: openshift-gitops
-                key: {{operator}}-rolearn
+                name: operator-rolearn
+                key: rolearn
       destination:
         server: https://kubernetes.default.svc
         namespace: '{{namespace}}'

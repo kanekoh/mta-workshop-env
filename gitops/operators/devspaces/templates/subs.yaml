@@ -18,7 +18,6 @@ spec:
       valueFrom:
         configMapKeyRef:
           name: {{ .Values.subscription.rolearnConfigMap.name }}
-          namespace: {{ .Values.subscription.rolearnConfigMap.namespace }}
           key: {{ .Values.subscription.rolearnConfigMap.key }}
 {{- else if .Values.subscription.config }}
   config:

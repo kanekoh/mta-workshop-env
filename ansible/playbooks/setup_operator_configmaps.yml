@@ -31,29 +31,30 @@
         devspaces_role_arn: "{{ devspaces_role_arn_output.stdout | default('') }}"
       when: devspaces_role_arn_output.rc == 0
     
-    - name: Ensure openshift-gitops namespace exists
+    - name: Ensure openshift-devspaces namespace exists
       kubernetes.core.k8s:
-        name: openshift-gitops
+        name: openshift-devspaces
         api_version: v1
         kind: Namespace
         state: present
+      when: devspaces_role_arn is defined
     
-    - name: Create ConfigMap for Operator RoleARNs
+    - name: Create ConfigMap for DevSpaces RoleARN in openshift-devspaces namespace
       kubernetes.core.k8s:
-        name: operator-rolearns
-        namespace: openshift-gitops
+        name: operator-rolearn
+        namespace: openshift-devspaces
         api_version: v1
         kind: ConfigMap
         state: present
         definition:
           metadata:
-            name: operator-rolearns
-            namespace: openshift-gitops
+            name: operator-rolearn
+            namespace: openshift-devspaces
           data:
-            devspaces-rolearn: "{{ devspaces_role_arn | default('') }}"
+            rolearn: "{{ devspaces_role_arn | default('') }}"
       when: devspaces_role_arn is defined
     
     - name: Display ConfigMap creation status
       debug:
-        msg: "Operator RoleARN ConfigMap created. DevSpaces: {{ devspaces_role_arn | default('not configured') }}"
+        msg: "Operator RoleARN ConfigMap created in openshift-devspaces namespace. DevSpaces: {{ devspaces_role_arn | default('not configured') }}"
 
