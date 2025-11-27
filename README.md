@@ -5,9 +5,8 @@
 ## 概要
 
 - **Terraform**: Red Hat OpenShift for AWS (ROSA) HCP クラスターの構築
-- **Ansible**: OpenShift IDP設定、ArgoCD構築、RHACM構築などの構成管理
-- **RHACM**: Operatorのインストールと管理（PolicyGeneratorを使用）
-- **GitOps (ArgoCD)**: アプリケーションと環境固有リソースの継続的デリバリー
+- **Ansible**: OpenShift IDP設定、ArgoCD構築などの構成管理
+- **GitOps (ArgoCD)**: Operatorとアプリケーションの継続的デリバリー（ApplicationSetを使用）
 
 ## 前提条件
 
@@ -321,7 +320,7 @@ TerraformでROSAクラスターが構築された後、Ansibleを使用して以
 - htpasswd Identity Provider の設定
 - ワークショップユーザーの作成
 - OpenShift GitOps (ArgoCD) のインストールと設定
-- Red Hat Advanced Cluster Management (RHACM) のインストールと設定
+- Operator RoleARN ConfigMapの作成
 - その他のワークショップ環境の準備
 
 ```bash
@@ -329,13 +328,13 @@ cd ../ansible
 ansible-playbook site.yml
 ```
 
-### 4. RHACMによるOperator管理
+### 4. ArgoCD ApplicationSetによるOperator管理
 
-このプロジェクトでは、Red Hat Advanced Cluster Management (RHACM) のPolicyGeneratorを使用して、すべてのOperatorを管理します。
+このプロジェクトでは、ArgoCDのApplicationSetを使用して、すべてのOperatorを管理します。
 
-#### Operator管理の棲み分け
+#### Operator管理の仕組み
 
-- **RHACM**: インフラレベルのOperatorのインストールと管理
+- **ArgoCD ApplicationSet**: OperatorのSubscriptionリソースを管理
   - NFD Operator
   - NVIDIA GPU Operator
   - OpenShift AI Operator
@@ -348,19 +347,19 @@ ansible-playbook site.yml
   - `gitops/environments/{env-name}/resources/` 配下のリソース
   - 環境ごとに異なる設定やカスタムリソース
 
-#### RHACMの設定
+#### ApplicationSetの設定
 
-RHACMはAnsible playbook実行時に自動的にインストールされ、PolicyGenerator定義に基づいてOperatorが管理されます。
+ApplicationSetはAnsible playbook実行時に自動的に適用され、各Operator用のApplicationを動的に生成します。
 
-PolicyGenerator定義は `rhacm/policies/operators/` ディレクトリに配置され、Operatorマニフェストは `rhacm/manifests/operators/` ディレクトリに配置されます。
+ApplicationSet定義は `gitops/applicationsets/operators/operators-applicationset.yaml` に配置され、Operatorマニフェストは `gitops/operators/` ディレクトリに配置されます。
 
-詳細は `rhacm/policies/README.md` を参照してください。
+詳細は `gitops/applicationsets/operators/README.md` を参照してください。
 
 #### DevSpaces用AWS Role ARNの設定
 
-DevSpaces OperatorのインストールにはAWS IAM Role ARNが必要です。`deploy.sh`は自動的にTerraform outputからRole ARNを取得し、`rhacm/manifests/operators/devspaces/subs.yml`に設定します。
+DevSpaces OperatorのインストールにはAWS IAM Role ARNが必要です。Ansible playbookが自動的にTerraform outputからRole ARNを取得し、`operator-rolearns` ConfigMapに保存します。ApplicationSetがこのConfigMapからRoleARNを読み取り、Helm Chartを通じてSubscriptionに注入します。
 
-Role ARNの形式: `arn:aws:iam::{account_id}:role/{cluster_name}-operator-roles-devspaces`
+Role ARNの形式: `arn:aws:iam::{account_id}:user/{iam_user_name}`
 
 ### 5. GitOps環境の切り替え
 
@@ -395,19 +394,15 @@ source env.sh
 #### ディレクトリ構造
 
 ```
-rhacm/
-├── policies/
-│   └── operators/                # PolicyGenerator定義
-│       ├── nfd-operator-policygenerator.yaml
-│       ├── nvidia-operator-policygenerator.yaml
-│       └── ...
-└── manifests/
-    └── operators/                 # Operatorマニフェスト
-        ├── nfd-operator/
-        ├── nvidia-operator/
-        └── ...
-
 gitops/
+├── applicationsets/
+│   └── operators/
+│       └── operators-applicationset.yaml  # ApplicationSet定義
+├── operators/
+│   ├── nfd-operator/              # Operatorマニフェスト
+│   ├── nvidia-operator/
+│   ├── devspaces/                 # Helm Chart（RoleARN注入用）
+│   └── ...
 └── environments/
     ├── mta/
     │   ├── apps/                # Application定義
@@ -552,16 +547,16 @@ rosa logs install -c mta-lightspeed --watch
 │   ├── inventory/
 │   ├── playbooks/
 │   └── roles/
-│       ├── openshift_gitops/     # OpenShift GitOps (ArgoCD) ロール
-│       └── rhacm/                # RHACM ロール
-├── rhacm/                        # RHACM設定
-│   ├── policies/                 # PolicyGenerator定義
-│   │   └── operators/           # Operator用PolicyGenerator
-│   └── manifests/                # Operatorマニフェスト
-│       └── operators/            # Operator定義（Namespace, Subscription, CR等）
+│       └── openshift_gitops/     # OpenShift GitOps (ArgoCD) ロール
 └── gitops/                       # GitOps設定（ArgoCD用）
+    ├── applicationsets/          # ApplicationSet定義
+    │   └── operators/           # Operator用ApplicationSet
+    ├── operators/                # Operatorマニフェスト
+    │   ├── nfd-operator/
+    │   ├── nvidia-operator/
+    │   ├── devspaces/           # Helm Chart（RoleARN注入用）
+    │   └── ...
     └── environments/             # 環境別設定
-    └── environments/            # 環境別の設定
         ├── mta/                 # MTA環境
         │   ├── apps/            # Application定義ファイル
         │   ├── operators/       # 環境専用Operator（オプション）

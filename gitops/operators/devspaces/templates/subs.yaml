@@ -1,0 +1,27 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: devspaces
+  namespace: openshift-devspaces
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  channel: {{ .Values.subscription.channel | default "stable" }}
+  name: {{ .Values.subscription.name | default "devspaces" }}
+  source: {{ .Values.subscription.source | default "redhat-operators" }}
+  sourceNamespace: {{ .Values.subscription.sourceNamespace | default "openshift-marketplace" }}
+  installPlanApproval: {{ .Values.subscription.installPlanApproval | default "Automatic" }}
+{{- if .Values.subscription.rolearnConfigMap }}
+  config:
+    env:
+    - name: ROLEARN
+      valueFrom:
+        configMapKeyRef:
+          name: {{ .Values.subscription.rolearnConfigMap.name }}
+          namespace: {{ .Values.subscription.rolearnConfigMap.namespace }}
+          key: {{ .Values.subscription.rolearnConfigMap.key }}
+{{- else if .Values.subscription.config }}
+  config:
+{{ toYaml .Values.subscription.config | indent 4 }}
+{{- end }}
+

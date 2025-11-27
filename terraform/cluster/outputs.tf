@@ -59,9 +59,14 @@ output "aws_account_id" {
   value       = data.aws_caller_identity.current.account_id
 }
 
+output "admin_user_arn" {
+  description = "AWS IAM User ARN for RHACM and DevSpaces operators (used for ROLEARN)"
+  value       = data.aws_iam_user.admin_user.arn
+}
+
 output "devspaces_role_arn" {
-  description = "AWS IAM Role ARN for DevSpaces ServiceAccount"
-  value       = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.cluster_name}-operator-roles-devspaces"
+  description = "AWS IAM User ARN for DevSpaces Operator (alias for admin_user_arn)"
+  value       = data.aws_iam_user.admin_user.arn
 }
 
 # Ansible Inventory Output (JSON format)

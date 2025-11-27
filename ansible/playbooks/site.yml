@@ -36,5 +36,8 @@
     
 - import_playbook: install_gitops.yml
 
-- import_playbook: install_rhacm.yml
+# RHACM is no longer used - Operators are managed via ArgoCD ApplicationSet
+# - import_playbook: install_rhacm.yml
+
+- import_playbook: setup_operator_configmaps.yml
 

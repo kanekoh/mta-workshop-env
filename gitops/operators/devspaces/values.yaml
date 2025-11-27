@@ -1,0 +1,14 @@
+# Default values for devspaces-operator
+subscription:
+  channel: stable
+  name: devspaces
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  # RoleARN will be injected from ConfigMap via ApplicationSet
+  # rolearnConfigMap will be set by ApplicationSet's Helm values
+  # rolearnConfigMap:
+  #   name: operator-rolearns
+  #   namespace: openshift-gitops
+  #   key: devspaces-rolearn
+

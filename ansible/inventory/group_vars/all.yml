@@ -27,21 +27,3 @@ openshift_gitops:
     enabled: true
     name: gitops-app-of-apps
 
-# RHACM Configuration
-rhacm:
-  # Operator subscription settings
-  operator_namespace: open-cluster-management
-  operator_name: advanced-cluster-management
-  operator_channel: release-2.11
-  operator_source: redhat-operators
-  
-  # RHACM namespace settings
-  namespace: open-cluster-management
-  hub_namespace: open-cluster-management-hub
-  
-  # GitOps Repository Configuration for PolicyGenerator
-  gitops_repo:
-    url: https://github.com/kanekoh/mta-workshop-env.git
-    branch: main
-    path: rhacm/manifests
-

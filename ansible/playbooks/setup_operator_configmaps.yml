@@ -1,0 +1,59 @@
+---
+# Playbook for creating ConfigMaps with RoleARNs for Operators
+- name: Setup Operator RoleARN ConfigMaps
+  hosts: openshift
+  gather_facts: true
+  
+  tasks:
+    - name: Verify cluster connection
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: default
+      register: cluster_connection
+      failed_when: false
+    
+    - name: Fail if cluster is not accessible
+      fail:
+        msg: "Cannot connect to OpenShift cluster. Please ensure you are logged in with 'oc login'."
+      when: cluster_connection.failed | default(true)
+    
+    - name: Get DevSpaces Role ARN from Terraform output
+      command: terraform output -raw devspaces_role_arn
+      args:
+        chdir: "{{ playbook_dir }}/../../terraform/cluster"
+      register: devspaces_role_arn_output
+      changed_when: false
+      failed_when: false
+    
+    - name: Set DevSpaces Role ARN fact
+      set_fact:
+        devspaces_role_arn: "{{ devspaces_role_arn_output.stdout | default('') }}"
+      when: devspaces_role_arn_output.rc == 0
+    
+    - name: Ensure openshift-gitops namespace exists
+      kubernetes.core.k8s:
+        name: openshift-gitops
+        api_version: v1
+        kind: Namespace
+        state: present
+    
+    - name: Create ConfigMap for Operator RoleARNs
+      kubernetes.core.k8s:
+        name: operator-rolearns
+        namespace: openshift-gitops
+        api_version: v1
+        kind: ConfigMap
+        state: present
+        definition:
+          metadata:
+            name: operator-rolearns
+            namespace: openshift-gitops
+          data:
+            devspaces-rolearn: "{{ devspaces_role_arn | default('') }}"
+      when: devspaces_role_arn is defined
+    
+    - name: Display ConfigMap creation status
+      debug:
+        msg: "Operator RoleARN ConfigMap created. DevSpaces: {{ devspaces_role_arn | default('not configured') }}"
+

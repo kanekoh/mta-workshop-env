@@ -32,6 +32,11 @@
 # cluster_admin_username = "cluster-admin"
 # cluster_admin_password = "your-cluster-admin-password"
 
+# AWS IAM User for RHACM and DevSpaces operators (optional)
+# If not specified, defaults to "open-environment-bt9hh-admin"
+# This user's ARN will be used for ROLEARN in operator subscriptions
+# admin_user_name = "open-environment-bt9hh-admin"
+
 # IDP Passwords (optional)
 # admin_password     = "your-admin-password"
 # developer_password = "your-developer-password"

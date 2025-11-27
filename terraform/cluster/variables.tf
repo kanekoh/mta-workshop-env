@@ -127,6 +127,12 @@ variable "availability_zones" {
 
 # Additional MachinePools (2nd pool and beyond)
 # The first MachinePool is created automatically by module.rosa_hcp and cannot be deleted.
+variable "admin_user_name" {
+  description = "AWS IAM User name for RHACM and DevSpaces operators (used for ROLEARN)"
+  type        = string
+  default     = "open-environment-bt9hh-admin"
+}
+
 variable "additional_machine_pools" {
   description = "List of additional MachinePools to create. The first MachinePool is managed by module.rosa_hcp."
   type = list(object({

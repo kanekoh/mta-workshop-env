@@ -1,0 +1,96 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: operators
+  namespace: openshift-gitops
+spec:
+  generators:
+  - list:
+      elements:
+      # NFD Operator
+      - operator: nfd-operator
+        namespace: openshift-nfd
+        channel: stable
+        source: redhat-operators
+        operatorName: nfd
+        needsRoleARN: false
+      # NVIDIA GPU Operator
+      - operator: nvidia-operator
+        namespace: nvidia-gpu-operator
+        channel: v25.3
+        source: certified-operators
+        operatorName: gpu-operator-certified
+        needsRoleARN: false
+      # OpenShift AI Operator
+      - operator: openshift-ai
+        namespace: redhat-ods-operator
+        channel: stable
+        source: redhat-operators
+        operatorName: rhods-operator
+        needsRoleARN: false
+      # Authorino Operator
+      - operator: authorino
+        namespace: openshift-operators
+        channel: stable
+        source: redhat-operators
+        operatorName: authorino-operator
+        needsRoleARN: false
+      # DevSpaces Operator
+      - operator: devspaces
+        namespace: openshift-devspaces
+        channel: stable
+        source: redhat-operators
+        operatorName: devspaces
+        needsRoleARN: true
+      # Cloud Native PostgreSQL Operator
+      - operator: cnpg-operator
+        namespace: cnpg-system
+        channel: stable-v1.26
+        source: certified-operators
+        operatorName: cloud-native-postgresql
+        needsRoleARN: false
+      # Keycloak Operator
+      - operator: keycloak-operator
+        namespace: keycloak-operator
+        channel: stable-v26
+        source: redhat-operators
+        operatorName: rhbk-operator
+        needsRoleARN: false
+  template:
+    metadata:
+      name: '{{operator}}-operator'
+      namespace: openshift-gitops
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/kanekoh/mta-workshop-env.git
+        targetRevision: main
+        path: gitops/operators/{{operator}}
+        {{- if needsRoleARN}}
+        helm:
+          valueFiles:
+          - values.yaml
+          values: |
+            subscription:
+              rolearnConfigMap:
+                name: operator-rolearns
+                namespace: openshift-gitops
+                key: {{operator}}-rolearn
+        {{- else}}
+        directory:
+          recurse: true
+        {{- end}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+          - PruneLast=true
+

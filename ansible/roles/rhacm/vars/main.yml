@@ -1,4 +1,0 @@
----
-# Variables for RHACM role
-# These can be overridden in group_vars or via -e flag
-

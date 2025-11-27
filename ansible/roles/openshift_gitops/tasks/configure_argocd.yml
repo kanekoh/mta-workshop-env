@@ -70,3 +70,23 @@
     - openshift_gitops.gitops_repo.path is defined
     - openshift_gitops.gitops_repo.path | length > 0
 
+- name: Find ApplicationSet file
+  find:
+    paths: "{{ playbook_dir }}/../../gitops/applicationsets/operators"
+    patterns: "*.yaml"
+    recurse: false
+  register: applicationset_files
+  failed_when: false
+
+- name: Apply Operator ApplicationSet
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('file', item.path) | from_yaml }}"
+  loop: "{{ applicationset_files.files | default([]) }}"
+  when:
+    - openshift_gitops.gitops_repo.url is defined
+    - openshift_gitops.gitops_repo.url | length > 0
+    - applicationset_files.files | length > 0
+  # Note: ApplicationSet can also be applied manually:
+  # oc apply -f gitops/applicationsets/operators/operators-applicationset.yaml
+
