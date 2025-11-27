@@ -1,14 +1,14 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: cloud-native-postgresql
+  name: cloudnative-pg
   namespace: cnpg-system
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
   channel: "stable-v1.26"
   installPlanApproval: Automatic
-  name: cloud-native-postgresql
+  name: cloudnative-pg
   source: certified-operators
   sourceNamespace: openshift-marketplace
 
