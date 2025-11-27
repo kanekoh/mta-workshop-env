@@ -25,42 +25,6 @@ spec:
       # Keycloak Operator
       - operator: keycloak-operator
         namespace: keycloak-operator
-  template:
-    metadata:
-      name: '{{operator}}-operator'
-      namespace: openshift-gitops
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
-    spec:
-      project: default
-      source:
-        repoURL: https://github.com/kanekoh/mta-workshop-env.git
-        targetRevision: main
-        path: gitops/operators/{{operator}}
-        directory:
-          recurse: true
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: '{{namespace}}'
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
-          - PrunePropagationPolicy=foreground
-          - PruneLast=true
----
-# ApplicationSet for operators that need RoleARN (Helm Chart)
-apiVersion: argoproj.io/v1alpha1
-kind: ApplicationSet
-metadata:
-  name: operators-with-rolearn
-  namespace: openshift-gitops
-spec:
-  generators:
-  - list:
-      elements:
       # DevSpaces Operator
       - operator: devspaces
         namespace: openshift-devspaces
@@ -76,14 +40,8 @@ spec:
         repoURL: https://github.com/kanekoh/mta-workshop-env.git
         targetRevision: main
         path: gitops/operators/{{operator}}
-        helm:
-          valueFiles:
-          - values.yaml
-          values: |
-            subscription:
-              rolearnConfigMap:
-                name: operator-rolearn
-                key: rolearn
+        directory:
+          recurse: true
       destination:
         server: https://kubernetes.default.svc
         namespace: '{{namespace}}'
