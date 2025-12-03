@@ -8,4 +8,5 @@ metadata:
 spec:
   targetNamespaces:
   - cnpg-system
+  - keycloak-operator
 
