@@ -128,9 +128,9 @@ variable "availability_zones" {
 # Additional MachinePools (2nd pool and beyond)
 # The first MachinePool is created automatically by module.rosa_hcp and cannot be deleted.
 variable "admin_user_name" {
-  description = "AWS IAM User name for RHACM and DevSpaces operators (used for ROLEARN)"
+  description = "AWS IAM User name for RHACM and DevSpaces operators (used for ROLEARN). If not specified, the IAM user name will be automatically extracted from the current AWS credentials (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)."
   type        = string
-  default     = "open-environment-bt9hh-admin"
+  default     = null
 }
 
 variable "additional_machine_pools" {

@@ -61,17 +61,17 @@ output "aws_account_id" {
 
 output "admin_user_arn" {
   description = "AWS IAM User ARN for RHACM and DevSpaces operators (used for ROLEARN)"
-  value       = data.aws_iam_user.admin_user.arn
+  value       = local.admin_user_arn
 }
 
 output "devspaces_role_arn" {
   description = "AWS IAM User ARN for DevSpaces Operator (alias for admin_user_arn)"
-  value       = data.aws_iam_user.admin_user.arn
+  value       = local.admin_user_arn
 }
 
 output "cnpg_role_arn" {
   description = "AWS IAM User ARN for CNPG Operator (alias for admin_user_arn)"
-  value       = data.aws_iam_user.admin_user.arn
+  value       = local.admin_user_arn
 }
 
 # Ansible Inventory Output (JSON format)
@@ -98,8 +98,8 @@ output "ansible_inventory_json" {
       private_subnet_ids = var.private_subnet_ids
     }
     role_arns = {
-      devspaces = data.aws_iam_user.admin_user.arn
-      cnpg      = data.aws_iam_user.admin_user.arn
+      devspaces = local.admin_user_arn
+      cnpg      = local.admin_user_arn
     }
   })
   sensitive = true

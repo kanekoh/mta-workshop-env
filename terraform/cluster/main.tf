@@ -1,11 +1,6 @@
 # 現在の AWS アカウント ID
 data "aws_caller_identity" "current" {}
 
-# IAM User for RHACM and DevSpaces operators
-data "aws_iam_user" "admin_user" {
-  user_name = var.admin_user_name
-}
-
 # ROSA HCP モジュール
 module "rosa_hcp" {
   source  = "terraform-redhat/rosa-hcp/rhcs"
