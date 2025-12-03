@@ -3,6 +3,8 @@ apiVersion: postgresql.cnpg.io/v1
 metadata:
   name: postgres
   namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   bootstrap:
     initdb:
