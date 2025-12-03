@@ -2,7 +2,7 @@ kind: Cluster
 apiVersion: postgresql.cnpg.io/v1
 metadata:
   name: postgres
-  namespace: keycloak
+  namespace: keycloak-operator
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
