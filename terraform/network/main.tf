@@ -22,6 +22,9 @@ resource "aws_internet_gateway" "rosa_igw" {
       Name = "${var.cluster_name}-igw"
     }
   )
+  
+  # depends_onは不要（循環依存を避けるため）
+  # Terraformはリソース間の参照関係から自動的に削除順序を決定します
 }
 
 # Get available AZs
@@ -72,7 +75,8 @@ resource "aws_eip" "rosa_nat_eip" {
     }
   )
 
-  depends_on = [aws_internet_gateway.rosa_igw]
+  # depends_onは不要（循環依存を避けるため）
+  # NAT GatewayがこのEIPを参照しているため、自動的に削除順序が制御されます
 }
 
 # NAT Gateway
@@ -88,7 +92,7 @@ resource "aws_nat_gateway" "rosa_nat_gw" {
     }
   )
 
-  depends_on = [aws_internet_gateway.rosa_igw]
+  # depends_onは不要（EIPとSubnetへの参照により自動的に削除順序が制御されます）
 }
 
 # Public Route Table
@@ -124,6 +128,8 @@ resource "aws_route_table" "rosa_private_rt" {
       Name = "${var.cluster_name}-private-rt-${count.index + 1}"
     }
   )
+
+  # depends_onは不要（NAT Gatewayへの参照により自動的に削除順序が制御されます）
 }
 
 # Route Table Associations
