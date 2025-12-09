@@ -4,4 +4,4 @@ metadata:
   name: llm-serving
   labels:
     opendatahub.io/application-namespace: 'true' 
-    opendatahub.io/dashboard=true
+    opendatahub.io/dashboard: true
