@@ -14,7 +14,7 @@ metadata:
     openshift.io/description: ""
     openshift.io/display-name: odh-tool
   name: odh-tool
-  namespace: odh-tool
+  namespace: llm-serving
 spec:
   template:
     spec:
