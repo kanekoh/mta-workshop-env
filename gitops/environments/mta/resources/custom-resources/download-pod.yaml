@@ -2,9 +2,9 @@ apiVersion: v1
 kind: Pod
 metadata:
   generateName: hf-download-model-
+  namespace: llm-serving
   labels:
     name: hf-download-model
-    namespace: llm-serving
 spec:
   volumes:
     - name: model-store
