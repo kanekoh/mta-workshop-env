@@ -4,6 +4,7 @@ metadata:
   generateName: hf-download-model-
   labels:
     name: hf-download-model
+    namespace: llm-serving
 spec:
   volumes:
     - name: model-store
