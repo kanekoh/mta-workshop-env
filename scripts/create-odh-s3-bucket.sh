@@ -59,5 +59,3 @@ echo "  Bucket: ${BUCKET_NAME}"
 echo "  Region: ${REGION}"
 
 
-
-

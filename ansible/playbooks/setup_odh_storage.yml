@@ -1,0 +1,134 @@
+---
+# Playbook for setting up S3 storage for ODH-tool and OpenShift AI
+- name: Setup ODH Storage (S3)
+  hosts: openshift
+  gather_facts: true
+  vars:
+    cluster_info_file: "{{ playbook_dir }}/../cluster_info.json"
+  
+  tasks:
+    - name: Verify cluster connection
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: default
+      register: cluster_connection
+      failed_when: false
+    
+    - name: Fail if cluster is not accessible
+      fail:
+        msg: "Cannot connect to OpenShift cluster. Please ensure you are logged in with 'oc login'."
+      when: cluster_connection.failed | default(true)
+    
+    - name: Load cluster information from cluster_info.json
+      set_fact:
+        cluster_info: "{{ lookup('file', cluster_info_file) | from_json }}"
+      when: cluster_info_file is defined
+      register: cluster_info_result
+      failed_when: false
+    
+    - name: Set cluster variables from cluster_info
+      set_fact:
+        cluster_name: "{{ cluster_info.cluster.name }}"
+        aws_region: "{{ cluster_info.cluster.region }}"
+      when: 
+        - cluster_info is defined
+        - cluster_info.cluster is defined
+    
+    - name: Get AWS account ID
+      shell: aws sts get-caller-identity --query Account --output text
+      register: aws_account_id_result
+      changed_when: false
+    
+    - name: Set AWS account ID
+      set_fact:
+        aws_account_id: "{{ aws_account_id_result.stdout }}"
+    
+    - name: Set S3 bucket name
+      set_fact:
+        s3_bucket_name: "{{ cluster_name }}-odh-storage-{{ aws_account_id }}"
+        s3_endpoint: "s3.{{ aws_region }}.amazonaws.com"
+    
+    - name: Check if S3 bucket exists
+      shell: aws s3api head-bucket --bucket "{{ s3_bucket_name }}" 2>&1
+      register: bucket_check
+      failed_when: false
+      changed_when: false
+    
+    - name: Create S3 bucket if it doesn't exist
+      shell: |
+        if [ "{{ aws_region }}" = "us-east-1" ]; then
+          aws s3api create-bucket --bucket "{{ s3_bucket_name }}" --region "{{ aws_region }}"
+        else
+          aws s3api create-bucket --bucket "{{ s3_bucket_name }}" --region "{{ aws_region }}" --create-bucket-configuration LocationConstraint="{{ aws_region }}"
+        fi
+      when: bucket_check.rc != 0
+      register: bucket_create
+    
+    - name: Set public access block for S3 bucket
+      shell: |
+        aws s3api put-public-access-block \
+          --bucket "{{ s3_bucket_name }}" \
+          --public-access-block-configuration \
+            "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+      when: bucket_check.rc != 0 or bucket_create.changed | default(false)
+    
+    - name: Set tags for S3 bucket
+      shell: |
+        aws s3api put-bucket-tagging \
+          --bucket "{{ s3_bucket_name }}" \
+          --tagging "TagSet=[{Key=Purpose,Value=ODHStorage},{Key=Cluster,Value={{ cluster_name }}}]"
+      when: bucket_check.rc != 0 or bucket_create.changed | default(false)
+    
+    - name: Ensure odh-tool namespace exists
+      kubernetes.core.k8s:
+        name: odh-tool
+        api_version: v1
+        kind: Namespace
+        state: present
+    
+    - name: Get AWS credentials from environment
+      set_fact:
+        aws_access_key_id: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        aws_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+    
+    - name: Fail if AWS credentials are not set
+      fail:
+        msg: "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables must be set"
+      when: 
+        - aws_access_key_id is not defined or aws_access_key_id == ""
+        - aws_secret_access_key is not defined or aws_secret_access_key == ""
+    
+    - name: Create Secret for ODH-tool S3 storage
+      kubernetes.core.k8s:
+        name: my-storage
+        namespace: odh-tool
+        api_version: v1
+        kind: Secret
+        state: present
+        definition:
+          metadata:
+            name: my-storage
+            namespace: odh-tool
+          type: Opaque
+          stringData:
+            AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
+            AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
+            AWS_S3_BUCKET: "{{ s3_bucket_name }}"
+            AWS_S3_ENDPOINT: "{{ s3_endpoint }}"
+            AWS_REGION: "{{ aws_region }}"
+            AWS_S3_FORCE_PATH_STYLE: "true"
+    
+    - name: Display S3 storage setup status
+      debug:
+        msg: "S3 storage setup completed. Bucket: {{ s3_bucket_name }}, Secret: my-storage in namespace odh-tool"
+    
+    # Note: OpenShift AI Connection登録について
+    # OpenShift AIのConnectionは、Secret作成後、OpenShift AIダッシュボードから手動で登録するか、
+    # DataScienceConnectionカスタムリソースを作成する必要があります。
+    # Connectionリソースの形式は、OpenShift AI Operatorのバージョンによって異なる可能性があるため、
+    # 実際の環境で確認が必要です。
+    # 
+    # 参考: OpenShift AIダッシュボードで「Data connections」→「Add data connection」から
+    # Secret `my-storage`を参照するConnectionを作成できます。
+

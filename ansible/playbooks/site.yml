@@ -41,3 +41,7 @@
 
 - import_playbook: setup_operator_configmaps.yml
 
+- import_playbook: setup_tackle_secret.yml
+
+- import_playbook: setup_odh_storage.yml
+

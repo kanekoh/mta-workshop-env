@@ -521,6 +521,82 @@ rosa describe cluster -c mta-lightspeed
 rosa logs install -c mta-lightspeed --watch
 ```
 
+### Terraformインポート時のNull conditionエラー
+
+既存のROSAクラスターをTerraform Stateにインポートする際、以下のエラーが発生する場合があります：
+
+```
+Error: Null condition
+
+  on .terraform/modules/rosa_hcp/modules/rosa-cluster-hcp/main.tf line 142, in resource "rhcs_hcp_default_ingress" "default_ingress":
+ 142:   count   = rhcs_cluster_rosa_hcp.rosa_hcp_cluster.wait_for_create_complete ? 1 : 0
+    │
+    │ rhcs_cluster_rosa_hcp.rosa_hcp_cluster.wait_for_create_complete is null
+
+The condition value is null. Conditions must either be true or false.
+```
+
+#### 原因
+
+`terraform import`で既存クラスターをインポートすると、Stateには実際のリソース属性のみが記録されます。`wait_for_create_complete`は設定パラメータであり、既存リソースには存在しないため、Stateでは`null`になります。しかし、`rosa-hcp`モジュール内の条件式は`null`を許可しないため、エラーが発生します。
+
+#### 対処方法
+
+Terraform Stateファイルを直接編集して、`wait_for_create_complete`属性を`true`に設定します。
+
+1. **クラスターIDを取得**
+
+   HybridCloudConsole（Red Hat OpenShift Cluster Manager）からクラスターIDを取得します。
+   または、`rosa describe cluster -c <cluster_name>`コマンドでIDを確認できます。
+
+2. **Stateファイルのバックアップ**
+
+   ```bash
+   cd terraform/cluster
+   cp terraform.tfstate terraform.tfstate.backup
+   ```
+
+3. **Stateファイルを編集**
+
+   `terraform.tfstate`の`resources`配列に、以下のリソース定義を追加します：
+
+   ```json
+   {
+     "module": "module.rosa_hcp.module.rosa_cluster_hcp",
+     "mode": "managed",
+     "type": "rhcs_cluster_rosa_hcp",
+     "name": "rosa_hcp_cluster",
+     "provider": "provider[\"registry.terraform.io/terraform-redhat/rhcs\"]",
+     "instances": [
+       {
+         "schema_version": 0,
+         "attributes": {
+           "id": "<cluster_id>",
+           "wait_for_create_complete": true
+         },
+         "sensitive_attributes": [],
+         "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjAifQ==",
+         "dependencies": []
+       }
+     ]
+   }
+   ```
+
+   `<cluster_id>`は、HybridCloudConsoleから取得したクラスターIDに置き換えてください。
+
+4. **検証**
+
+   ```bash
+   terraform state list | grep rosa_hcp_cluster
+   terraform plan
+   ```
+
+   エラーが解消され、`terraform plan`が正常に実行できることを確認してください。
+
+5. **削除の確認**
+
+   Stateに正しく追加されていれば、`terraform destroy`でクラスターを削除できるようになります。
+
 ## プロジェクト構成
 
 ```

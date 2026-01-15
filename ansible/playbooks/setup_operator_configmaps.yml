@@ -27,62 +27,73 @@
       register: cluster_info_result
       failed_when: false
     
-    - name: Set RoleARN facts from cluster_info
+    - name: Set RoleARN map and GitOps paths
       set_fact:
-        devspaces_role_arn: "{{ cluster_info.role_arns.devspaces | default('') }}"
-        cnpg_role_arn: "{{ cluster_info.role_arns.cnpg | default('') }}"
-      when: 
+        rolearn_map: "{{ cluster_info.role_arns | default({}) }}"
+        repo_root: "{{ playbook_dir }}/../.."
+        gitops_env_name: "{{ gitops_env | default('mta') }}"
+        gitops_apps_path: "{{ repo_root }}/gitops/environments/{{ gitops_env_name }}/apps"
+      when:
         - cluster_info is defined
-        - cluster_info.role_arns is defined
-    
-    - name: Ensure openshift-devspaces namespace exists
-      kubernetes.core.k8s:
-        name: openshift-devspaces
-        api_version: v1
-        kind: Namespace
-        state: present
-      when: devspaces_role_arn is defined
-    
-    - name: Create ConfigMap for DevSpaces RoleARN in openshift-devspaces namespace
-      kubernetes.core.k8s:
-        name: operator-rolearn
-        namespace: openshift-devspaces
-        api_version: v1
-        kind: ConfigMap
-        state: present
-        definition:
-          metadata:
+
+    - name: Create RoleARN ConfigMaps for selected Operators
+      vars:
+        rolearn_value: "{{ rolearn_map[op.rolearn_key] | default('') }}"
+        app_path: "{{ gitops_apps_path }}/{{ op.app_file }}"
+        subs_path: "{{ repo_root }}/{{ op.subs_path }}"
+      block:
+        - name: Check operator app exists in env
+          stat:
+            path: "{{ app_path }}"
+          register: app_stat
+
+        - name: Check operator subs.yaml exists
+          stat:
+            path: "{{ subs_path }}"
+          register: subs_stat
+
+        - name: Read operator subs.yaml
+          slurp:
+            path: "{{ subs_path }}"
+          register: subs_file
+          when: subs_stat.stat.exists | default(false)
+
+        - name: Ensure operator namespace exists
+          kubernetes.core.k8s:
+            name: "{{ op.namespace }}"
+            api_version: v1
+            kind: Namespace
+            state: present
+          when:
+            - app_stat.stat.exists | default(false)
+            - (subs_file.content | default('') | b64decode) is search('ROLEARN')
+            - rolearn_value | length > 0
+
+        - name: Create ConfigMap for Operator RoleARN
+          kubernetes.core.k8s:
             name: operator-rolearn
-            namespace: openshift-devspaces
-          data:
-            rolearn: "{{ devspaces_role_arn | default('') }}"
-      when: devspaces_role_arn is defined
-    
-    
-    - name: Ensure cnpg-system namespace exists
-      kubernetes.core.k8s:
-        name: cnpg-system
-        api_version: v1
-        kind: Namespace
-        state: present
-      when: cnpg_role_arn is defined
-    
-    - name: Create ConfigMap for CNPG RoleARN in cnpg-system namespace
-      kubernetes.core.k8s:
-        name: operator-rolearn
-        namespace: cnpg-system
-        api_version: v1
-        kind: ConfigMap
-        state: present
-        definition:
-          metadata:
-            name: operator-rolearn
-            namespace: cnpg-system
-          data:
-            rolearn: "{{ cnpg_role_arn | default('') }}"
-      when: cnpg_role_arn is defined
-    
-    - name: Display ConfigMap creation status
+            namespace: "{{ op.namespace }}"
+            api_version: v1
+            kind: ConfigMap
+            state: present
+            definition:
+              metadata:
+                name: operator-rolearn
+                namespace: "{{ op.namespace }}"
+              data:
+                rolearn: "{{ rolearn_value }}"
+          when:
+            - app_stat.stat.exists | default(false)
+            - (subs_file.content | default('') | b64decode) is search('ROLEARN')
+            - rolearn_value | length > 0
+      loop: "{{ operator_rolearn_configmaps | default([]) }}"
+      loop_control:
+        loop_var: op
+      when:
+        - rolearn_map is defined
+        - gitops_apps_path is defined
+
+    - name: Display ConfigMap evaluation status
       debug:
-        msg: "Operator RoleARN ConfigMaps created. DevSpaces: {{ devspaces_role_arn | default('not configured') }}, CNPG: {{ cnpg_role_arn | default('not configured') }}"
+        msg: "Operator RoleARN ConfigMap evaluation complete for gitops_env={{ gitops_env | default('mta') }}."
 

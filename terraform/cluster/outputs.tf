@@ -100,6 +100,7 @@ output "ansible_inventory_json" {
     role_arns = {
       devspaces = local.admin_user_arn
       cnpg      = local.admin_user_arn
+      mta       = local.admin_user_arn
     }
   })
   sensitive = true

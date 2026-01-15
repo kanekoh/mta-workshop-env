@@ -27,3 +27,22 @@ openshift_gitops:
     enabled: true
     name: gitops-app-of-apps
 
+# Operators that require RoleARN ConfigMaps.
+# These are created only when the corresponding Operator Application exists
+# in gitops/environments/{gitops_env}/apps and the Subscription contains ROLEARN.
+operator_rolearn_configmaps:
+  - name: devspaces
+    app_file: devspaces-operator.yml
+    namespace: openshift-devspaces
+    rolearn_key: devspaces
+    subs_path: gitops/operators/devspaces/subs.yaml
+  - name: cnpg
+    app_file: cnpg-operator.yml
+    namespace: cnpg-system
+    rolearn_key: cnpg
+    subs_path: gitops/operators/cnpg-operator/subs.yaml
+  - name: mta
+    app_file: mta-operator.yml
+    namespace: openshift-mta
+    rolearn_key: mta
+    subs_path: gitops/operators/mta-operator/subs.yaml
