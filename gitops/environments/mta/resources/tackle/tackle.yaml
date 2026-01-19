@@ -1,0 +1,11 @@
+apiVersion: tackle.konveyor.io/v1alpha1
+kind: Tackle
+metadata:
+  name: tackle
+  namespace: openshift-mta
+spec:
+  feature_auth_required: "false"
+  kai_api_key_secret_name: my-kai-secret
+  kai_llm_model: RedHatAI/Qwen2.5-VL-7B-Instruct-FP8-Dynamic
+  kai_llm_provider: openai
+  kai_solution_server_enabled: true

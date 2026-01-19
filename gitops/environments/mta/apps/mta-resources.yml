@@ -23,4 +23,12 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+  ignoreDifferences:
+    - group: tackle.konveyor.io
+      kind: Tackle
+      name: tackle
+      namespace: openshift-mta
+      jsonPointers:
+        - /spec/kai_llm_model
+        - /spec/kai_llm_provider
 

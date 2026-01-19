@@ -222,12 +222,14 @@ source env.sh
 source env.sh
 ```
 
-`env.sh` では以下の変数を設定します：
+`env.sh` では以下の変数を設定します（詳細は `env.sh.example` を参照）：
 - `TF_VAR_aws_region` - AWSリージョン
 - `TF_VAR_cluster_name` - クラスター名
 - `TF_VAR_ocp_version` - OpenShiftバージョン
 - `TF_VAR_billing_account` - AWS Billing Account（機密情報）
-- その他の設定値
+- `GITOPS_ENV` - GitOps 環境名（例: `mta`, `mta_light`, `other`）
+- `RUN_ANSIBLE` - Ansible 実行フラグ
+- `OPENAI_API_BASE` / `OPENAI_API_KEY` - Tackle 用 KAI 連携の接続情報（Secret 作成用）
 
 #### ステップ 2: フェーズ1 - ネットワークリソースの構築
 
@@ -328,13 +330,13 @@ cd ../ansible
 ansible-playbook site.yml
 ```
 
-### 4. ArgoCD ApplicationSetによるOperator管理
+### 4. ArgoCD によるOperator管理
 
-このプロジェクトでは、ArgoCDのApplicationSetを使用して、すべてのOperatorを管理します。
+このプロジェクトでは、ArgoCD の App-of-Apps パターンで Operator と環境固有リソースを管理します。
 
-#### Operator管理の仕組み
+#### Operator 管理の仕組み
 
-- **ArgoCD ApplicationSet**: OperatorのSubscriptionリソースを管理
+- **ArgoCD Application**: Operator の Subscription リソースを管理
   - NFD Operator
   - NVIDIA GPU Operator
   - OpenShift AI Operator
@@ -347,17 +349,17 @@ ansible-playbook site.yml
   - `gitops/environments/{env-name}/resources/` 配下のリソース
   - 環境ごとに異なる設定やカスタムリソース
 
-#### ApplicationSetの設定
+#### ApplicationSet の扱い
 
-ApplicationSetはAnsible playbook実行時に自動的に適用され、各Operator用のApplicationを動的に生成します。
+ApplicationSet はオプションです。現状は `gitops/environments/{env-name}/apps/` に Application を置く構成が主となっています。
 
-ApplicationSet定義は `gitops/applicationsets/operators/operators-applicationset.yaml` に配置され、Operatorマニフェストは `gitops/operators/` ディレクトリに配置されます。
+ApplicationSet を使う場合は `gitops/applicationsets/operators/operators-applicationset.yaml` を有効化し、Operator マニフェストは `gitops/operators/` 配下に配置します。
 
 詳細は `gitops/applicationsets/operators/README.md` を参照してください。
 
-#### DevSpaces用AWS Role ARNの設定
+#### Role ARN が必要な Operator の設定
 
-DevSpaces OperatorのインストールにはAWS IAM Role ARNが必要です。Ansible playbookが自動的にTerraform outputからRole ARNを取得し、`operator-rolearns` ConfigMapに保存します。ApplicationSetがこのConfigMapからRoleARNを読み取り、Helm Chartを通じてSubscriptionに注入します。
+DevSpaces / CNPG / MTA など一部 Operator のインストールには AWS IAM Role ARN が必要です。Ansible が Terraform output から Role ARN を取得し、`operator-rolearn` ConfigMap に保存します。Subscription はこの ConfigMap を参照します。
 
 Role ARNの形式: `arn:aws:iam::{account_id}:user/{iam_user_name}`
 
@@ -368,6 +370,7 @@ Role ARNの形式: `arn:aws:iam::{account_id}:user/{iam_user_name}`
 #### 環境の種類
 
 - **mta** (デフォルト): MTA for Developer Lightspeedワークショップ用の環境
+- **mta_light**: MTA 最小構成向けの環境
 - **other**: その他のカスタム環境
 
 #### 使用方法
@@ -378,7 +381,10 @@ Role ARNの形式: `arn:aws:iam::{account_id}:user/{iam_user_name}`
 # MTA環境を使用（デフォルト）
 export GITOPS_ENV="mta"
 
-# または、その他の環境を使用
+# MTA Light を使用
+export GITOPS_ENV="mta_light"
+
+# その他の環境を使用
 export GITOPS_ENV="other"
 ```
 

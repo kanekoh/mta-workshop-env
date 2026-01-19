@@ -1,0 +1,45 @@
+---
+- name: Check operator app exists in env
+  stat:
+    path: "{{ app_path }}"
+  register: app_stat
+
+- name: Check operator subs.yaml exists
+  stat:
+    path: "{{ subs_path }}"
+  register: subs_stat
+
+- name: Read operator subs.yaml
+  slurp:
+    path: "{{ subs_path }}"
+  register: subs_file
+  when: subs_stat.stat.exists | default(false)
+
+- name: Ensure operator namespace exists
+  kubernetes.core.k8s:
+    name: "{{ op.namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+  when:
+    - app_stat.stat.exists | default(false)
+    - (subs_file.content | default('') | b64decode) is search('ROLEARN')
+    - rolearn_value | length > 0
+
+- name: Create ConfigMap for Operator RoleARN
+  kubernetes.core.k8s:
+    name: operator-rolearn
+    namespace: "{{ op.namespace }}"
+    api_version: v1
+    kind: ConfigMap
+    state: present
+    definition:
+      metadata:
+        name: operator-rolearn
+        namespace: "{{ op.namespace }}"
+      data:
+        rolearn: "{{ rolearn_value }}"
+  when:
+    - app_stat.stat.exists | default(false)
+    - (subs_file.content | default('') | b64decode) is search('ROLEARN')
+    - rolearn_value | length > 0
