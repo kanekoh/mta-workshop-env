@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
-  channel: stable
+  channel: stable-v8.0
   installPlanApproval: Automatic
   name: mta-operator
   source: redhat-operators
