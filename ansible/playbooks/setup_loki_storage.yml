@@ -1,0 +1,126 @@
+---
+# Playbook for setting up S3 storage for Loki (Network Observability)
+# Uses same AWS credentials as ODH (env.sh AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+- name: Setup Loki Storage (S3)
+  hosts: openshift
+  gather_facts: true
+  vars:
+    cluster_info_file: "{{ playbook_dir }}/../cluster_info.json"
+    loki_secret_namespace: "openshift-operators-redhat"
+    loki_secret_name: "loki-s3-credentials"
+
+  tasks:
+    - name: Verify cluster connection
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: default
+      register: cluster_connection
+      failed_when: false
+
+    - name: Fail if cluster is not accessible
+      fail:
+        msg: "Cannot connect to OpenShift cluster. Please ensure you are logged in with 'oc login'."
+      when: cluster_connection.failed | default(true)
+
+    - name: Load cluster information from cluster_info.json
+      set_fact:
+        cluster_info: "{{ lookup('file', cluster_info_file) | from_json }}"
+      when: cluster_info_file is defined
+      register: cluster_info_result
+      failed_when: false
+
+    - name: Set cluster variables from cluster_info
+      set_fact:
+        cluster_name: "{{ cluster_info.cluster.name }}"
+        aws_region: "{{ cluster_info.cluster.region }}"
+      when:
+        - cluster_info is defined
+        - cluster_info.cluster is defined
+
+    - name: Get AWS account ID
+      shell: aws sts get-caller-identity --query Account --output text
+      register: aws_account_id_result
+      changed_when: false
+
+    - name: Set AWS account ID
+      set_fact:
+        aws_account_id: "{{ aws_account_id_result.stdout }}"
+
+    - name: Set Loki S3 bucket name and endpoint
+      set_fact:
+        loki_s3_bucket_name: "{{ cluster_name }}-loki-{{ aws_account_id }}"
+        loki_s3_endpoint: "s3.{{ aws_region }}.amazonaws.com"
+
+    - name: Check if Loki S3 bucket exists
+      shell: aws s3api head-bucket --bucket "{{ loki_s3_bucket_name }}" 2>&1
+      register: loki_bucket_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create Loki S3 bucket if it doesn't exist
+      shell: |
+        if [ "{{ aws_region }}" = "us-east-1" ]; then
+          aws s3api create-bucket --bucket "{{ loki_s3_bucket_name }}" --region "{{ aws_region }}"
+        else
+          aws s3api create-bucket --bucket "{{ loki_s3_bucket_name }}" --region "{{ aws_region }}" --create-bucket-configuration LocationConstraint="{{ aws_region }}"
+        fi
+      when: loki_bucket_check.rc != 0
+      register: loki_bucket_create
+
+    - name: Set public access block for Loki S3 bucket
+      shell: |
+        aws s3api put-public-access-block \
+          --bucket "{{ loki_s3_bucket_name }}" \
+          --public-access-block-configuration \
+            "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+      when: loki_bucket_check.rc != 0 or loki_bucket_create.changed | default(false)
+
+    - name: Set tags for Loki S3 bucket
+      shell: |
+        aws s3api put-bucket-tagging \
+          --bucket "{{ loki_s3_bucket_name }}" \
+          --tagging "TagSet=[{Key=Purpose,Value=LokiStorage},{Key=Cluster,Value={{ cluster_name }}}]"
+      when: loki_bucket_check.rc != 0 or loki_bucket_create.changed | default(false)
+
+    - name: Ensure openshift-operators-redhat namespace exists
+      kubernetes.core.k8s:
+        name: "{{ loki_secret_namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Get AWS credentials from environment (same as ODH)
+      set_fact:
+        aws_access_key_id: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        aws_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+
+    - name: Fail if AWS credentials are not set
+      fail:
+        msg: "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables must be set (same as ODH storage)"
+      when:
+        - aws_access_key_id is not defined or aws_access_key_id == ""
+        - aws_secret_access_key is not defined or aws_secret_access_key == ""
+
+    - name: Create Secret for Loki S3 storage (Loki Operator format)
+      kubernetes.core.k8s:
+        name: "{{ loki_secret_name }}"
+        namespace: "{{ loki_secret_namespace }}"
+        api_version: v1
+        kind: Secret
+        state: present
+        definition:
+          metadata:
+            name: "{{ loki_secret_name }}"
+            namespace: "{{ loki_secret_namespace }}"
+          type: Opaque
+          stringData:
+            bucketnames: "{{ loki_s3_bucket_name }}"
+            endpoint: "https://{{ loki_s3_endpoint }}"
+            access_key_id: "{{ aws_access_key_id }}"
+            access_key_secret: "{{ aws_secret_access_key }}"
+            region: "{{ aws_region }}"
+
+    - name: Display Loki S3 storage setup status
+      debug:
+        msg: "Loki S3 storage setup completed. Bucket: {{ loki_s3_bucket_name }}, Secret: {{ loki_secret_name }} in namespace {{ loki_secret_namespace }}"
