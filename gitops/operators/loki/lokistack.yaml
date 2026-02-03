@@ -1,6 +1,6 @@
 # LokiStack for Network Observability (dedicated instance, separate from cluster logging)
 # Secret loki-s3-credentials must exist in openshift-operators-redhat (created by Ansible setup_loki_storage.yml)
-apiVersion: lokistack.loki.grafana.com/v1
+apiVersion: loki.grafana.com/v1
 kind: LokiStack
 metadata:
   name: network-observability
