@@ -6,5 +6,4 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  targetNamespaces:
-    - openshift-operators-redhat
+  upgradeStrategy: Default

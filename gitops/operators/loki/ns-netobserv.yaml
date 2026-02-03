@@ -1,0 +1,8 @@
+# netobserv namespace for LokiStack and loki-s3-credentials Secret
+# Secret is created by Ansible setup_loki_storage.yml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: netobserv
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"

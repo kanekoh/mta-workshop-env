@@ -6,7 +6,7 @@
   gather_facts: true
   vars:
     cluster_info_file: "{{ playbook_dir }}/../cluster_info.json"
-    loki_secret_namespace: "openshift-operators-redhat"
+    loki_secret_namespace: "netobserv"
     loki_secret_name: "loki-s3-credentials"
 
   tasks:
@@ -83,7 +83,7 @@
           --tagging "TagSet=[{Key=Purpose,Value=LokiStorage},{Key=Cluster,Value={{ cluster_name }}}]"
       when: loki_bucket_check.rc != 0 or loki_bucket_create.changed | default(false)
 
-    - name: Ensure openshift-operators-redhat namespace exists
+    - name: Ensure netobserv namespace exists
       kubernetes.core.k8s:
         name: "{{ loki_secret_namespace }}"
         api_version: v1
