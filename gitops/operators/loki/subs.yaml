@@ -8,6 +8,6 @@ metadata:
 spec:
   channel: stable
   installPlanApproval: Automatic
-  name: loki
+  name: loki-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
