@@ -9,8 +9,14 @@ metadata:
     argocd.argoproj.io/sync-wave: "3"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-  size: 1x.extra-small
+  size: 1x.pico
   storage:
-    type: s3
+    schemas:
+    - version: v12
+      effectiveDate: '2022-06-01'
     secret:
       name: loki-s3-credentials
+      type: s3
+  storageClassName: gp3-csi
+  tenants:
+    mode: openshift-network
