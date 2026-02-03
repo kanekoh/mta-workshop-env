@@ -9,7 +9,15 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-  namespace: netobserv
+agent:
+    type: EBPF  # eBPF モードであることを確認
+    ebpf:
+      # ここが重要です
+      features:
+        - PacketDrop   # パケットドロップの理由を含めて収集
+        - FlowRTT      # TCP の RTT (Handshake latency) を収集
+        - DNSTracking  # (任意) DNSの応答時間なども取りたい場合
+      privileged: true # PacketDrop を有効にするには特権モードが必要です  namespace: netobserv
   deploymentModel: Direct
   loki:
     mode: LokiStack
