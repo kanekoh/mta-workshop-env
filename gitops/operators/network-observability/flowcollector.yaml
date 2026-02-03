@@ -1,0 +1,18 @@
+# FlowCollector for Network Observability - uses dedicated LokiStack (network-observability in openshift-operators-redhat)
+# Must be named "cluster"; only one instance per cluster.
+# Requires Loki Operator and LokiStack "network-observability" to be deployed first.
+apiVersion: flows.netobserv.io/v1beta2
+kind: FlowCollector
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  namespace: netobserv
+  deploymentModel: Direct
+  loki:
+    mode: LokiStack
+    lokiStack:
+      name: network-observability
+      namespace: openshift-operators-redhat
