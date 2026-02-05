@@ -69,5 +69,5 @@
     - openshift_gitops.gitops_repo.url | length > 0
     - openshift_gitops.gitops_repo.path is defined
     - openshift_gitops.gitops_repo.path | length > 0
-  # Note: ApplicationSet is managed via GitOps (Application in gitops/environments/mta/apps/)
+  # Note: path = gitops/environments/{{ gitops_env }}/apps (group_vars). observ も GITOPS_ENV=observ で同じ扱い。
 
