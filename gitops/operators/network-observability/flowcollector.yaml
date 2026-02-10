@@ -9,7 +9,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-agent:
+  agent:
     type: EBPF  # eBPF モードであることを確認
     ebpf:
       # ここが重要です
