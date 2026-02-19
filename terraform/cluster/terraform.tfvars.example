@@ -20,7 +20,8 @@
 #   export TF_VAR_cluster_name="my-custom-cluster"
 #   export TF_VAR_ocp_version="4.20"
 #   export TF_VAR_rosa_machine_type="m6a.4xlarge"
-#   export TF_VAR_rosa_replicas="3"
+#   export TF_VAR_worker_pool_replicas="2"   # 追加 Worker 数（0=初期のみ。合計=初期2or3+ここ）
+#   # rosa_replicas は非推奨。初期は Single=2 / Multi=3 固定。
 #
 # ============================================================================
 # 必須設定: ネットワークモジュールの出力
@@ -41,9 +42,12 @@
 # admin_password     = "your-admin-password"
 # developer_password = "your-developer-password"
 
-# Additional MachinePools (optional)
-# The first MachinePool is automatically created by module.rosa_hcp and cannot be deleted.
-# These are additional MachinePools (2nd pool and beyond) for specific workloads.
+# Worker Pool: 追加台数（2本目の Machine Pool）。デフォルト 0。
+# worker_pool_replicas = 2   # 追加 2 台（合計 = 初期 2 or 3 + 2）
+
+# Additional MachinePools (optional, 3rd pool and beyond)
+# The first Machine Pool is created by module.rosa_hcp (Single=2, Multi=3, immutable).
+# The second is "workers" (worker_pool_replicas). These are 3rd and beyond for GPU, etc.
 #
 # Example: GPU pool for OpenShift AI / LLM serving
 # additional_machine_pools = [

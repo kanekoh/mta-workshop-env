@@ -2,6 +2,10 @@ locals {
   cluster_id  = module.rosa_hcp.cluster_id
   admin_group = "cluster-admins"
 
+  # 初期 Worker Machine Pool の replicas（構築時のみ有効・変更不可）
+  # Single-AZ (private subnet 1) = 2, Multi-AZ (3 subnets) = 3（ROSA の「private subnets の倍数」）
+  initial_worker_replicas = length(var.private_subnet_ids) == 1 ? 2 : 3
+
   # 管理者ユーザー名: admin / admin2 / admin3 ...
   admin_usernames = var.admin_count == 1 ? [
     "admin"

@@ -18,7 +18,8 @@ module "rosa_hcp" {
   aws_availability_zones = var.availability_zones
 
   # --- Compute 設定 ---
-  replicas             = var.rosa_replicas
+  # 初期 Worker は固定（Single=2, Multi=3）。スケールは 2 本目の Machine Pool (worker_pool) で行う。
+  replicas             = local.initial_worker_replicas
   compute_machine_type = var.rosa_machine_type
 
   # --- STS / IAM / OIDC 周り ---

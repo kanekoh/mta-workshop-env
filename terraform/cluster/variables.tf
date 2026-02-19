@@ -34,9 +34,15 @@ variable "rosa_machine_type" {
 }
 
 variable "rosa_replicas" {
-  description = "Number of compute node replicas"
+  description = "[Deprecated] Initial Worker Pool is fixed (Single=2, Multi=3). Use worker_pool_replicas for scaling. Kept for backward compatibility only."
   type        = number
   default     = 2
+}
+
+variable "worker_pool_replicas" {
+  description = "Second Machine Pool (workers) node count. Stored as max(2, this value) because HCP does not allow 0 and does not allow deleting the pool. Total workers = initial (2 or 3) + this pool (2+)."
+  type        = number
+  default     = 0
 }
 
 variable "availability_zone_count" {

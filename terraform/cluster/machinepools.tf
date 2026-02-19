@@ -1,13 +1,33 @@
-# Additional MachinePools for ROSA HCP Cluster
-# 
-# Note: The first MachinePool is automatically created by module.rosa_hcp
-# and cannot be deleted. This file manages additional MachinePools (2nd and beyond).
+# MachinePools for ROSA HCP Cluster
 #
-# These MachinePools are useful for:
-# - OpenShift AI workloads requiring GPU instances
-# - Workloads with specific resource requirements
-# - Isolating workloads by node type
+# - 1st Machine Pool: Created by module.rosa_hcp (initial_worker_replicas: Single=2, Multi=3). Immutable after create.
+# - 2nd Machine Pool "workers": replicas は常に min 2（HCP は 0 台不可・削除も不可のため、0 指定時は 2 にフォールバック）。
+# - 3rd and beyond: additional_machine_pools (GPU, etc.)
 
+# 2nd Machine Pool: 追加台数用。replicas は常に 2 以上（HCP 制約）。削除は行わない。
+resource "rhcs_hcp_machine_pool" "worker_pool" {
+  cluster  = local.cluster_id
+  name     = "workers"
+  replicas = max(2, var.worker_pool_replicas)
+  autoscaling = {
+    enabled = false
+  }
+  
+  aws_node_pool = {
+    instance_type = var.rosa_machine_type
+  }
+
+  auto_repair = true
+  subnet_id   = var.private_subnet_ids[0]
+  labels = {
+    "pool" = "workers"
+  }
+  taints = null
+
+  depends_on = [module.rosa_hcp]
+}
+
+# Additional MachinePools (3rd and beyond): GPU, workload-specific, etc.
 resource "rhcs_hcp_machine_pool" "additional" {
   for_each = {
     for idx, pool in var.additional_machine_pools : pool.name => pool
