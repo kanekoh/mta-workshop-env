@@ -7,9 +7,11 @@
 # 1. Terraformを使用してROSA HCPクラスターを構築
 #
 # オプション:
-#   --log-file <file>    ログを指定ファイルに出力
-#   -l, --log            ログをデフォルトファイル名で出力（deploy-YYYYMMDD-HHMMSS.log）
-#   -h, --help           ヘルプを表示
+#   --log-file <file>       ログを指定ファイルに出力
+#   -l, --log               ログをデフォルトファイル名で出力（deploy-YYYYMMDD-HHMMSS.log）
+#   --cluster-via <mode>    クラスター構築方式: 'terraform'（デフォルト）または 'rosa-cli'
+#   --force                 既存リソースがあっても強制デプロイ
+#   -h, --help              ヘルプを表示
 #
 # 環境変数:
 #   DEPLOY_LOG_FILE      ログファイルパス（--log-fileオプションで上書き可能）
@@ -22,6 +24,7 @@ cd "$SCRIPT_DIR"
 # ログファイル設定（環境変数から読み込み）
 LOG_FILE="${DEPLOY_LOG_FILE:-}"
 FORCE_DEPLOY=false
+CLUSTER_VIA="${CLUSTER_VIA:-terraform}"  # terraform | rosa-cli
 
 # オプション解析
 while [[ $# -gt 0 ]]; do
@@ -40,23 +43,34 @@ while [[ $# -gt 0 ]]; do
             FORCE_DEPLOY=true
             shift
             ;;
+        --cluster-via)
+            CLUSTER_VIA="$2"
+            if [[ "$CLUSTER_VIA" != "terraform" && "$CLUSTER_VIA" != "rosa-cli" ]]; then
+                echo "Error: --cluster-via must be 'terraform' or 'rosa-cli'" >&2
+                exit 1
+            fi
+            shift 2
+            ;;
         -h|--help)
             cat << EOF
 Usage: $0 [OPTIONS]
 
 Options:
-  --log-file <file>    Log output to specified file
-  -l, --log            Log output to default file (deploy-YYYYMMDD-HHMMSS.log)
-  --force              Force deployment even if resources already exist
-  -h, --help           Show this help message
+  --log-file <file>       Log output to specified file
+  -l, --log               Log output to default file (deploy-YYYYMMDD-HHMMSS.log)
+  --cluster-via <mode>    Cluster provisioner: 'terraform' (default) or 'rosa-cli'
+  --force                 Force deployment even if resources already exist
+  -h, --help              Show this help message
 
 Environment Variables:
   DEPLOY_LOG_FILE      Log file path (overridden by --log-file option)
+  CLUSTER_VIA          Cluster provisioner (overridden by --cluster-via option)
 
 Examples:
   $0 --log
   $0 --log-file my-deploy.log
   $0 --force
+  $0 --cluster-via rosa-cli
   DEPLOY_LOG_FILE=deploy.log $0
 EOF
             exit 0
@@ -537,9 +551,220 @@ EOF
     
     # DevSpaces用のAWS Role ARNはAnsibleで設定されます
     log_info "DevSpaces用のAWS Role ARNはAnsible実行時に設定されます"
-    
+
     popd > /dev/null  # terraform/clusterから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
+}
+
+# クラスター起源メタデータの書き込み
+# $1: cluster_name, $2: provisioner (デフォルト: rosa-cli)
+# メタデータは .mta-demo/cluster-origin.json に保存される（.gitignore 済み）
+write_cluster_origin_metadata() {
+    local cluster_name="$1"
+    local provisioner="${2:-rosa-cli}"
+    local metadata_dir="${SCRIPT_DIR}/.mta-demo"
+    local metadata_file="${metadata_dir}/cluster-origin.json"
+
+    mkdir -p "$metadata_dir"
+    cat > "$metadata_file" << EOF
+{
+  "provisioner": "${provisioner}",
+  "cluster_name": "${cluster_name}",
+  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+    log_success "クラスター起源メタデータを保存しました: ${metadata_file}"
+    log_info "  provisioner=${provisioner}, cluster_name=${cluster_name}"
+}
+
+# フェーズ2（ROSA CLI）: ROSA CLI でクラスターを構築
+# - Terraform 用 RHCS SA（RHCS_CLIENT_ID / RHCS_CLIENT_SECRET）は不要
+# - terraform/cluster は一切使用しない
+deploy_cluster_rosa_cli() {
+    log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_info "フェーズ2: ROSAクラスターの構築（ROSA CLI 経由）"
+    log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_info "注意: terraform/cluster はスキップします"
+    log_info "      Terraform 用 RHCS SA（RHCS_CLIENT_ID/RHCS_CLIENT_SECRET）は不要です"
+
+    # ネットワーク出力を取得（deploy_network 完了済み前提）
+    pushd "$SCRIPT_DIR" > /dev/null || return 1
+    pushd terraform/network > /dev/null || {
+        log_error "terraform/network に移動できませんでした"
+        popd > /dev/null
+        return 1
+    }
+
+    local NETWORK_OUTPUTS
+    NETWORK_OUTPUTS=$(terraform output -json 2>/dev/null || echo "{}")
+    local VPC_CIDR PUBLIC_SUBNET_IDS PRIVATE_SUBNET_IDS
+    if command -v jq > /dev/null 2>&1; then
+        VPC_CIDR=$(echo "$NETWORK_OUTPUTS" | jq -r '.vpc_cidr.value // ""')
+        PUBLIC_SUBNET_IDS=$(echo "$NETWORK_OUTPUTS" | jq -r '.public_subnet_ids.value // [] | join(",")')
+        PRIVATE_SUBNET_IDS=$(echo "$NETWORK_OUTPUTS" | jq -r '.private_subnet_ids.value // [] | join(",")')
+    else
+        VPC_CIDR=$(terraform output -raw vpc_cidr 2>/dev/null || echo "")
+        PUBLIC_SUBNET_IDS=$(terraform output -json public_subnet_ids 2>/dev/null | \
+            python3 -c "import sys,json; print(','.join(json.load(sys.stdin)))" 2>/dev/null || echo "")
+        PRIVATE_SUBNET_IDS=$(terraform output -json private_subnet_ids 2>/dev/null | \
+            python3 -c "import sys,json; print(','.join(json.load(sys.stdin)))" 2>/dev/null || echo "")
+    fi
+    popd > /dev/null  # terraform/network から戻る
+    popd > /dev/null  # SCRIPT_DIR から戻る
+
+    if [ -z "$PRIVATE_SUBNET_IDS" ]; then
+        log_error "ネットワークモジュールの出力（private_subnet_ids）を取得できませんでした"
+        log_error "先に deploy_network（フェーズ1）を完了してください"
+        return 1
+    fi
+
+    # クラスター設定（環境変数優先）
+    local cluster_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+    local region="${TF_VAR_aws_region:-${AWS_DEFAULT_REGION:-ap-northeast-1}}"
+    local ocp_version="${TF_VAR_ocp_version:-4.19}"
+    local machine_type="${TF_VAR_rosa_machine_type:-m6a.2xlarge}"
+    local replicas="${TF_VAR_rosa_replicas:-2}"
+    local billing_account="${TF_VAR_billing_account:-}"
+
+    local account_role_prefix="${cluster_name}-account"
+    local operator_role_prefix="${cluster_name}-operator-roles"
+    # ROSA HCP では public + private 両方のサブネットが必要
+    local all_subnet_ids="${PUBLIC_SUBNET_IDS},${PRIVATE_SUBNET_IDS}"
+
+    log_info "クラスター設定:"
+    echo "  クラスター名    : ${cluster_name}"
+    echo "  リージョン      : ${region}"
+    echo "  OCP バージョン  : ${ocp_version}"
+    echo "  マシンタイプ    : ${machine_type}"
+    echo "  レプリカ数      : ${replicas}"
+    echo "  VPC CIDR       : ${VPC_CIDR}"
+    echo "  サブネット      : ${all_subnet_ids}"
+
+    # ステップ1: Account ロールの確認・作成
+    log_info "Account ロールの確認中（prefix: ${account_role_prefix}）..."
+    if rosa list account-roles --output json 2>/dev/null | \
+            grep -q "\"${account_role_prefix}-HCP-ROSA-Installer-Role\""; then
+        log_info "Account ロールは既に存在します"
+    else
+        log_info "Account ロールを作成中..."
+        rosa create account-roles \
+            --hosted-cp \
+            --prefix "${account_role_prefix}" \
+            --region "${region}" \
+            --mode auto \
+            --yes
+        log_success "Account ロールを作成しました"
+    fi
+
+    # AWS Account ID の取得
+    local account_id
+    account_id=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "")
+    if [ -z "$account_id" ]; then
+        log_error "AWS Account ID を取得できませんでした（aws sts get-caller-identity）"
+        return 1
+    fi
+
+    # ステップ2: OIDC Config の確認・作成
+    log_info "OIDC Config の確認中..."
+    local oidc_config_id
+    oidc_config_id=$(rosa list oidc-config --output json 2>/dev/null | \
+        jq -r 'if type == "array" then sort_by(.creation_timestamp // "") | last | .id // "" else "" end' \
+        2>/dev/null || echo "")
+
+    if [ -z "$oidc_config_id" ]; then
+        log_info "OIDC Config を作成中（managed）..."
+        # 作成前後の差分で新しい ID を特定する
+        local before_ids
+        before_ids=$(rosa list oidc-config --output json 2>/dev/null | \
+            jq -r '.[].id' 2>/dev/null || echo "")
+
+        rosa create oidc-config \
+            --managed \
+            --region "${region}" \
+            --mode auto \
+            --yes
+
+        oidc_config_id=$(rosa list oidc-config --output json 2>/dev/null | \
+            jq -r '.[].id' 2>/dev/null | \
+            while IFS= read -r id; do
+                echo "$before_ids" | grep -qxF "$id" || echo "$id"
+            done | head -1)
+
+        if [ -z "$oidc_config_id" ]; then
+            # フォールバック: 最新のものを使用
+            oidc_config_id=$(rosa list oidc-config --output json 2>/dev/null | \
+                jq -r 'sort_by(.creation_timestamp // "") | last | .id // ""' 2>/dev/null || echo "")
+        fi
+
+        if [ -z "$oidc_config_id" ]; then
+            log_error "OIDC Config ID を取得できませんでした"
+            return 1
+        fi
+        log_success "OIDC Config を作成しました (ID: ${oidc_config_id})"
+    else
+        log_info "OIDC Config は既に存在します (ID: ${oidc_config_id})"
+    fi
+
+    # ステップ3: Operator ロールの確認・作成
+    log_info "Operator ロールの確認中（prefix: ${operator_role_prefix}）..."
+    local installer_role_arn="arn:aws:iam::${account_id}:role/${account_role_prefix}-HCP-ROSA-Installer-Role"
+
+    if rosa list operator-roles --output json 2>/dev/null | grep -q "${operator_role_prefix}"; then
+        log_info "Operator ロールは既に存在します"
+    else
+        log_info "Operator ロールを作成中..."
+        rosa create operator-roles \
+            --hosted-cp \
+            --prefix "${operator_role_prefix}" \
+            --oidc-config-id "${oidc_config_id}" \
+            --installer-role-arn "${installer_role_arn}" \
+            --region "${region}" \
+            --mode auto \
+            --yes
+        log_success "Operator ロールを作成しました"
+    fi
+
+    # ステップ4: クラスターの作成
+    log_info "ROSA HCP クラスターを作成中（--watch で完了まで待機）..."
+    log_warning "注意: クラスター作成には約30-40分かかります"
+
+    local create_args=(
+        --cluster-name "${cluster_name}"
+        --sts
+        --hosted-cp
+        --region "${region}"
+        --subnet-ids "${all_subnet_ids}"
+        --machine-cidr "${VPC_CIDR}"
+        --version "${ocp_version}"
+        --operator-roles-prefix "${operator_role_prefix}"
+        --oidc-config-id "${oidc_config_id}"
+        --compute-machine-type "${machine_type}"
+        --replicas "${replicas}"
+        --mode auto
+        --yes
+        --watch
+    )
+    if [ -n "$billing_account" ]; then
+        create_args+=(--billing-account "${billing_account}")
+    fi
+
+    if rosa create cluster "${create_args[@]}"; then
+        log_success "ROSA CLI でクラスターの作成が完了しました！"
+
+        # メタデータ書き込み（rosa-cli で成功したときだけ）
+        write_cluster_origin_metadata "${cluster_name}" "rosa-cli"
+
+        echo ""
+        log_info "==== クラスター情報 ===="
+        rosa describe cluster -c "${cluster_name}" 2>/dev/null || true
+        echo ""
+        log_info "管理者パスワードの確認:"
+        echo "  rosa describe admin -c ${cluster_name}"
+        return 0
+    else
+        log_error "ROSA CLI でのクラスター作成に失敗しました"
+        return 1
+    fi
 }
 
 # Ansibleによる追加設定
@@ -690,31 +915,70 @@ main() {
     # ステップ4: フェーズ1 - ネットワークリソースの構築
     deploy_network
     
-    # ステップ5: フェーズ2 - ROSAクラスターの構築
+    # ステップ5: フェーズ2 - ROSAクラスターの構築（CLUSTER_VIA で分岐）
+    if [ "$CLUSTER_VIA" = "rosa-cli" ]; then
+        # --- ROSA CLI 経由 ---
+        log_info "クラスター構築方式: ROSA CLI（terraform/cluster はスキップ）"
+        deploy_cluster_rosa_cli
+
+        # ステップ8: Ansible（環境変数で有効化された場合のみ）
+        if [ "${RUN_ANSIBLE:-}" = "true" ]; then
+            run_ansible
+        else
+            log_info "Ansible実行はスキップされます（RUN_ANSIBLE=true を設定すると実行されます）"
+        fi
+
+        # 完了メッセージ（rosa-cli パス）
+        local cli_cluster_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+        echo ""
+        log_success "======================================"
+        log_success "  環境構築が完了しました！"
+        log_success "  （構築方式: ROSA CLI）"
+        log_success "======================================"
+        echo ""
+        log_info "次のステップ："
+        echo ""
+        echo "  1. クラスター情報を確認"
+        echo "     rosa describe cluster -c ${cli_cluster_name}"
+        echo ""
+        echo "  2. 管理者認証情報を確認"
+        echo "     rosa describe admin -c ${cli_cluster_name}"
+        echo ""
+        echo "  3. クラスターにログイン"
+        echo "     oc login <API_URL> -u cluster-admin -p <PASSWORD>"
+        echo ""
+        echo "  削除時は destroy.sh がメタデータ (.mta-demo/cluster-origin.json) を読み"
+        echo "  terraform/cluster をスキップして ROSA CLI で削除します"
+        echo ""
+        return 0
+    fi
+
+    # --- Terraform 経由（デフォルト）---
+    log_info "クラスター構築方式: Terraform"
     deploy_cluster
-    
+
     # ステップ6: クラスター構築の完了確認
     # Terraformが wait_for_create_complete = true で完了を待機したため、
     # 追加の待機処理は不要です
     log_info "クラスター構築はTerraformで完了しました"
-    
+
     # ステップ7: クラスターアクセス確認
     verify_cluster_access
-    
+
     # ステップ8: Ansibleによる追加設定（環境変数で有効化された場合のみ）
     if [ "${RUN_ANSIBLE:-}" = "true" ]; then
         run_ansible
     else
         log_info "Ansible実行はスキップされます（RUN_ANSIBLE=true を設定すると実行されます）"
     fi
-    
+
     # 完了メッセージ
     echo ""
     log_success "======================================"
     log_success "  環境構築が完了しました！"
     log_success "======================================"
     echo ""
-    
+
     # クラスター情報を取得して表示
     pushd "$SCRIPT_DIR" > /dev/null || return 1
     pushd terraform/cluster > /dev/null || {
@@ -736,7 +1000,7 @@ main() {
     fi
     popd > /dev/null  # terraform/clusterから戻る
     popd > /dev/null  # SCRIPT_DIRから戻る
-    
+
     log_info "次のステップ："
     echo ""
     echo "  1. クラスターにログイン"
