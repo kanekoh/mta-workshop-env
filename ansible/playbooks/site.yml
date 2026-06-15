@@ -1,12 +1,39 @@
 ---
 # Main playbook for OpenShift post-deployment configuration
+#
+# Playbook 実行制御:
+#   ansible_playbooks 変数（カンマ区切り文字列）で実行する playbook を制御します。
+#   未指定の場合は全 playbook を実行します（後方互換）。
+#
+#   指定可能な値:
+#     gitops        - OpenShift GitOps Operator + App-of-Apps
+#     configmaps    - Operator RoleARN ConfigMap
+#     tackle_secret - MTA Tackle AI/LLM シークレット
+#     odh_storage   - OpenShift AI 用 S3 バケット + シークレット
+#     loki_storage  - Loki 用 S3 バケット + シークレット
+#
+#   使用例:
+#     ansible-playbook site.yml -e "ansible_playbooks=gitops,configmaps"
+#     ansible-playbook site.yml -e "gitops_env=mta ansible_playbooks=gitops,configmaps,tackle_secret"
+
 - name: Configure OpenShift Cluster
   hosts: openshift
   gather_facts: true
   vars:
     cluster_info_file: "{{ playbook_dir }}/../cluster_info.json"
+    ansible_playbooks: "{{ lookup('env', 'ANSIBLE_PLAYBOOKS') | default('all', true) }}"
   
   tasks:
+    - name: Parse playbook selection
+      set_fact:
+        _pb_raw: "{{ ansible_playbooks }}"
+        playbooks_list: "{{ ansible_playbooks.split(',') | map('trim') | list }}"
+        run_all: "{{ (ansible_playbooks == 'all') or (ansible_playbooks | trim == '') }}"
+
+    - name: Display playbook selection
+      debug:
+        msg: "実行する playbook: {{ 'all (全て)' if (run_all | bool) else playbooks_list | join(', ') }}"
+
     - name: Load cluster information from Terraform output
       set_fact:
         cluster_info: "{{ lookup('file', cluster_info_file) | from_json }}"
@@ -35,15 +62,18 @@
         - cluster_info.cluster is defined
     
 - import_playbook: install_gitops.yml
-
-# RHACM is no longer used - Operators are managed via ArgoCD ApplicationSet
-# - import_playbook: install_rhacm.yml
+  when: hostvars['localhost']['run_all'] | bool or 'gitops' in hostvars['localhost']['playbooks_list']
 
 - import_playbook: setup_operator_configmaps.yml
+  when: hostvars['localhost']['run_all'] | bool or 'configmaps' in hostvars['localhost']['playbooks_list']
 
 - import_playbook: setup_tackle_secret.yml
+  when: hostvars['localhost']['run_all'] | bool or 'tackle_secret' in hostvars['localhost']['playbooks_list']
 
 - import_playbook: setup_odh_storage.yml
+  when: hostvars['localhost']['run_all'] | bool or 'odh_storage' in hostvars['localhost']['playbooks_list']
 
 - import_playbook: setup_loki_storage.yml
+  when: hostvars['localhost']['run_all'] | bool or 'loki_storage' in hostvars['localhost']['playbooks_list']
+
 

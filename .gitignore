@@ -4,6 +4,10 @@ env.sh
 *.tfvars
 !*.tfvars.example
 
+# Auto-generated tfvars (deploy.sh が生成)
+**/network-outputs.auto.tfvars
+**/gpu-pool.auto.tfvars
+
 # Terraform
 .terraform/
 .terraform.lock.hcl
