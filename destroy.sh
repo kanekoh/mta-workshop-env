@@ -651,18 +651,22 @@ destroy_cluster_rosa_cli() {
     fi
 }
 
-# ROSA CLI で作成した IAM ロール（Account / Operator）と OIDC config を削除する
-# クラスター削除完了後に呼ぶこと（クラスターが使用中の間は削除できない）
-# $1: cluster_name
-cleanup_rosa_cli_iam_resources() {
+# ROSA クラスターに紐づく IAM ロール（Account / Operator）と OIDC provider を削除する
+# Terraform モード・ROSA CLI モード問わずクラスター削除完了後に呼ぶ。
+# 冪等: 既に削除済みの場合もエラーにしない。
+# $1: cluster_name（Account Role prefix = {name}-account, Operator Role prefix = {name}-operator-roles）
+cleanup_iam_resources() {
     local cluster_name="$1"
     local account_role_prefix="${cluster_name}-account"
     local operator_role_prefix="${cluster_name}-operator-roles"
     local region="${AWS_DEFAULT_REGION:-ap-northeast-1}"
 
     log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    log_info "ROSA CLI 関連 IAM リソースのクリーンアップ"
+    log_info "IAM リソースのクリーンアップ（Account / Operator ロール + OIDC）"
     log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_info "クラスター名: ${cluster_name}"
+    log_info "Account Role prefix: ${account_role_prefix}"
+    log_info "Operator Role prefix: ${operator_role_prefix}"
 
     # Operator ロールの削除
     log_info "Operator ロールを削除中（prefix: ${operator_role_prefix}）..."
@@ -673,7 +677,7 @@ cleanup_rosa_cli_iam_resources() {
     if [ $op_exit -eq 0 ]; then
         log_success "Operator ロールを削除しました"
     else
-        log_warning "Operator ロールの削除に失敗しました（既に削除済み、または存在しない可能性）"
+        log_warning "Operator ロールの削除に失敗またはスキップ（既に削除済み、または存在しない可能性）"
     fi
 
     # OIDC provider の削除（クラスター固有の OIDC config ID を特定して削除）
@@ -706,10 +710,15 @@ cleanup_rosa_cli_iam_resources() {
     if [ $acct_exit -eq 0 ]; then
         log_success "Account ロールを削除しました"
     else
-        log_warning "Account ロールの削除に失敗しました（既に削除済み、または存在しない可能性）"
+        log_warning "Account ロールの削除に失敗またはスキップ（既に削除済み、または存在しない可能性）"
     fi
 
     log_success "IAM リソースのクリーンアップが完了しました"
+}
+
+# 後方互換エイリアス
+cleanup_rosa_cli_iam_resources() {
+    cleanup_iam_resources "$@"
 }
 
 # VPC IDをterraform/network出力から取得するヘルパー
@@ -1200,12 +1209,12 @@ main() {
     # ステップ4: クラスター削除の完了確認（rosa logs uninstall --watch）
     wait_for_cluster_deletion
 
-    # ステップ4.5: ROSA CLI モードの場合、IAM ロール/OIDC を削除
-    if [ "$_provisioner" = "rosa-cli" ]; then
-        local _iam_cluster_name
-        _iam_cluster_name=$(read_cluster_origin_name)
-        cleanup_rosa_cli_iam_resources "${_iam_cluster_name}"
-    fi
+    # ステップ4.5: IAM ロール/OIDC を削除（Terraform/rosa-cli 両モード共通）
+    # Terraform の rosa_hcp モジュールが作成した IAM Role も terraform destroy で
+    # 消えきらない場合があるため、常にクリーンアップを実行する（冪等）
+    local _iam_cluster_name
+    _iam_cluster_name=$(read_cluster_origin_name)
+    cleanup_iam_resources "${_iam_cluster_name}"
 
     # ステップ5: ENIのクリーンアップを待機
     wait_for_eni_cleanup
