@@ -31,33 +31,26 @@
         name: openshift-gitops-argocd-application-controller
         namespace: "{{ openshift_gitops.argocd_namespace }}"
 
-- name: Get ArgoCD Server Route URL
+- name: Get current Console operator config
   kubernetes.core.k8s_info:
-    api_version: route.openshift.io/v1
-    kind: Route
-    namespace: "{{ openshift_gitops.argocd_namespace }}"
-    name: openshift-gitops-server
-  register: argocd_route_result
+    api_version: operator.openshift.io/v1
+    kind: Console
+    name: cluster
+  register: console_operator
 
-- name: Create ConsoleLink for ArgoCD Dashboard
+- name: Enable GitOps Console Plugin
   kubernetes.core.k8s:
-    api_version: console.openshift.io/v1
-    kind: ConsoleLink
-    name: argocd-dashboard
+    api_version: operator.openshift.io/v1
+    kind: Console
+    name: cluster
     state: present
+    merge_type: merge
     definition:
-      metadata:
-        name: argocd-dashboard
       spec:
-        applicationMenu:
-          section: Red Hat applications
-          imageURL: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTYgMjU2Ij48cGF0aCBkPSJNMTI4IDI0QzYwLjYgMjQgNiA3MC40IDYgMTI4YzAgNTcuNiA1NC42IDEwNCAxMjIgMTA0czEyMi00Ni40IDEyMi0xMDRDMjUwIDcwLjQgMTk1LjQgMjQgMTI4IDI0em0wIDE3OS4yYy00MS40IDAtNzQuOC0zMy42LTc0LjgtNzUuMlMONi42IDUyLjggMTI4IDUyLjhzNzQuOCAzMy42IDc0LjggNzUuMi0zMy40IDc1LjItNzQuOCA3NS4yeiIgZmlsbD0iI2VmNTIyYiIvPjwvc3ZnPg=="
-        href: "https://{{ argocd_route_result.resources[0].spec.host | default('') }}"
-        location: ApplicationMenu
-        text: ArgoCD Dashboard
+        plugins: "{{ (console_operator.resources[0].spec.plugins | default([])) | union(['gitops-plugin']) | list }}"
   when:
-    - argocd_route_result.resources | length > 0
-    - argocd_route_result.resources[0].spec.host is defined
+    - console_operator.resources | length > 0
+    - "'gitops-plugin' not in (console_operator.resources[0].spec.plugins | default([]))"
 
 - name: Create AppOfApps Application (monitors gitops/apps directory)
   kubernetes.core.k8s:

@@ -169,15 +169,34 @@ check_prerequisites() {
     log_success "すべての必要なツールが確認されました"
 }
 
-# env.shの自動読み込み（条件付き）
+# プロファイル読み込み
+load_profile() {
+    if [ -z "${PROFILE:-}" ]; then
+        log_warning "PROFILE が未設定です。デフォルト 'mta-full' を使用します。"
+        log_info "明示的に指定する場合: export PROFILE=\"<profile-name>\""
+        log_info "利用可能: $(ls "${SCRIPT_DIR}/profiles/"*.env 2>/dev/null | xargs -I{} basename {} .env | tr '\n' ' ')"
+        PROFILE="mta-full"
+    fi
+
+    local profile_file="${SCRIPT_DIR}/profiles/${PROFILE}.env"
+    if [ -f "$profile_file" ]; then
+        source "$profile_file"
+        log_success "プロファイル '${PROFILE}' を読み込みました"
+    else
+        log_error "プロファイル '${PROFILE}' が見つかりません: ${profile_file}"
+        log_info "利用可能: $(ls "${SCRIPT_DIR}/profiles/"*.env 2>/dev/null | xargs -I{} basename {} .env | tr '\n' ' ')"
+        exit 1
+    fi
+}
+
+# env.shの自動読み込み（認証情報）
 load_env_if_needed() {
     if [ -f "env.sh" ]; then
-        if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+        if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
             log_info "env.sh を自動的に読み込みます..."
             source env.sh
         else
             log_info "環境変数が既に設定されています。env.sh の自動読み込みをスキップします。"
-            log_info "env.sh を読み込む場合は手動で 'source env.sh' を実行してください。"
         fi
     fi
 }
@@ -935,8 +954,11 @@ main() {
     
     # ステップ1: 前提条件の確認
     check_prerequisites
-    
-    # ステップ1.5: env.shの自動読み込み（必要な場合）
+
+    # ステップ1.5: プロファイル読み込み
+    load_profile
+
+    # ステップ1.6: env.sh の自動読み込み（認証情報）
     load_env_if_needed
     
     # ステップ2: 環境変数の確認

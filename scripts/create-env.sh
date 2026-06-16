@@ -77,34 +77,34 @@ cat > "$PROFILE_FILE" << EOF
 # Profile: ${ENV_NAME}
 # TODO: この環境の説明を書いてください
 
-PROFILE_NAME="${ENV_NAME}"
-GITOPS_ENV="${ENV_NAME}"
+export PROFILE_NAME="${ENV_NAME}"
+export GITOPS_ENV="${ENV_NAME}"
 
 # --- クラスター構成 ---
-CLUSTER_VIA="terraform"
-TF_VAR_rosa_machine_type="m6a.2xlarge"
-TF_VAR_worker_pool_replicas="2"
-TF_VAR_availability_zone_count="1"
+export CLUSTER_VIA="terraform"
+export TF_VAR_rosa_machine_type="m6a.2xlarge"
+export TF_VAR_worker_pool_replicas="2"
+export TF_VAR_availability_zone_count="1"
 
 # --- GPU ノードプール ---
 # 空=""の場合は GPU ノードを追加しない
 # 選択肢: g4dn.xlarge, g5.xlarge, g5.2xlarge, g6.xlarge, g6.2xlarge
-GPU_MACHINE_TYPE=""
-GPU_REPLICAS="0"
+export GPU_MACHINE_TYPE=""
+export GPU_REPLICAS="0"
 
 # --- Ansible 制御 ---
-RUN_ANSIBLE="true"
+export RUN_ANSIBLE="true"
 # 実行する playbook をカンマ区切りで指定:
 #   gitops        - OpenShift GitOps + App-of-Apps（ほぼ必須）
 #   configmaps    - Operator RoleARN ConfigMap
 #   tackle_secret - MTA Tackle の AI/LLM シークレット
 #   odh_storage   - OpenShift AI 用 S3 バケット
 #   loki_storage  - Loki 用 S3 バケット
-ANSIBLE_PLAYBOOKS="gitops,configmaps"
+export ANSIBLE_PLAYBOOKS="gitops,configmaps"
 
 # --- ワークショップユーザー ---
-TF_VAR_admin_count="1"
-TF_VAR_workshop_user_count="10"
+export TF_VAR_admin_count="1"
+export TF_VAR_workshop_user_count="10"
 EOF
 
 # 2. GitOps ディレクトリ構造
