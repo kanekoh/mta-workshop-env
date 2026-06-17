@@ -6,7 +6,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "2"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-  availabilityConfig: High
+  availabilityConfig: Basic
   overrides:
     components:
       - name: hypershift

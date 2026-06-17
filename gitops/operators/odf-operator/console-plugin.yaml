@@ -1,15 +1,64 @@
-apiVersion: console.openshift.io/v1
-kind: ConsolePlugin
+---
+apiVersion: v1
+kind: ServiceAccount
 metadata:
-  name: odf-console
+  name: odf-console-plugin-enable
+  namespace: openshift-storage
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "3"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: odf-console-plugin-enable
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+rules:
+  - apiGroups: ["operator.openshift.io"]
+    resources: ["consoles"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: odf-console-plugin-enable
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: odf-console-plugin-enable
+subjects:
+  - kind: ServiceAccount
+    name: odf-console-plugin-enable
+    namespace: openshift-storage
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enable-odf-console-plugin
+  namespace: openshift-storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
-  displayName: ODF Console
-  backend:
-    type: Service
-    service:
-      name: odf-console-service
-      namespace: openshift-storage
-      port: 9001
+  template:
+    spec:
+      serviceAccountName: odf-console-plugin-enable
+      restartPolicy: OnFailure
+      containers:
+        - name: enable-plugin
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              CURRENT=$(oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}')
+              if echo "$CURRENT" | grep -q "odf-console"; then
+                echo "odf-console plugin already enabled"
+              else
+                oc patch console.operator.openshift.io cluster --type=json \
+                  -p='[{"op":"add","path":"/spec/plugins/-","value":"odf-console"}]'
+                echo "odf-console plugin enabled"
+              fi
