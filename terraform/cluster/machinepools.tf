@@ -1,13 +1,16 @@
 # MachinePools for ROSA HCP Cluster
 #
 # - 1st Machine Pool: Created by module.rosa_hcp (initial_worker_replicas: Single=2, Multi=3). Immutable after create.
-# - 2nd Machine Pool "workers": replicas は常に min 2（HCP は 0 台不可・削除も不可のため、0 指定時は 2 にフォールバック）。
-# - 3rd and beyond: additional_machine_pools (GPU, etc.)
+# - 2nd Machine Pool "extra-workers": 追加ワーカー用。ROSA HCP ではデフォルト "workers" プール削除後に
+#   同名再作成不可のため別名を使用。worker_pool_replicas=0 の場合はスキップ。
+# - 3rd and beyond: additional_machine_pools (GPU, ODF, etc.)
 
-# 2nd Machine Pool: 追加台数用。replicas は常に 2 以上（HCP 制約）。削除は行わない。
+# 2nd Machine Pool: 追加ワーカー。replicas=0 ならスキップ、1以上なら min 2（HCP 制約）。
 resource "rhcs_hcp_machine_pool" "worker_pool" {
+  count = var.worker_pool_replicas > 0 ? 1 : 0
+
   cluster  = local.cluster_id
-  name     = "workers"
+  name     = "extra-workers"
   replicas = max(2, var.worker_pool_replicas)
   autoscaling = {
     enabled = false

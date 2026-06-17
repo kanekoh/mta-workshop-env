@@ -495,11 +495,31 @@ EOF
         has_pools=true
     fi
 
-    # ODF 専用ノードプール
+    # ODF 専用ノードプール（マルチ AZ の場合は AZ ごとに 1 プール作成）
     if [ -n "${ODF_MACHINE_TYPE:-}" ] && [ "${ODF_REPLICAS:-0}" != "0" ]; then
-        local odf_replicas="${ODF_REPLICAS:-3}"
-        log_info "追加プール [ODF]: ${ODF_MACHINE_TYPE} x ${odf_replicas}"
-        pools_content+="
+        local odf_replicas_per_az=1
+        local az_count="${TF_VAR_availability_zone_count:-1}"
+        local private_subnets
+        IFS=',' read -ra private_subnets <<< "$PRIVATE_SUBNET_IDS"
+
+        if [ "$az_count" -gt 1 ]; then
+            log_info "追加プール [ODF]: ${ODF_MACHINE_TYPE} x ${odf_replicas_per_az} (各 AZ に 1 プール、計 ${az_count} AZ)"
+            for i in $(seq 0 $((az_count - 1))); do
+                local subnet_id="${private_subnets[$i]:-${private_subnets[0]}}"
+                pools_content+="
+  {
+    name          = \"odf-${i}\"
+    instance_type = \"${ODF_MACHINE_TYPE}\"
+    replicas      = ${odf_replicas_per_az}
+    labels        = { \"cluster.ocs.openshift.io/openshift-storage\" = \"\" }
+    taints        = [{ key = \"node.ocs.openshift.io/storage\", value = \"true\", effect = \"NoSchedule\" }]
+    subnet_id     = \"${subnet_id}\"
+  },"
+            done
+        else
+            local odf_replicas="${ODF_REPLICAS:-3}"
+            log_info "追加プール [ODF]: ${ODF_MACHINE_TYPE} x ${odf_replicas} (Single AZ)"
+            pools_content+="
   {
     name          = \"odf\"
     instance_type = \"${ODF_MACHINE_TYPE}\"
@@ -507,6 +527,7 @@ EOF
     labels        = { \"cluster.ocs.openshift.io/openshift-storage\" = \"\" }
     taints        = [{ key = \"node.ocs.openshift.io/storage\", value = \"true\", effect = \"NoSchedule\" }]
   },"
+        fi
         has_pools=true
     fi
 
@@ -980,11 +1001,11 @@ main() {
     # ステップ1: 前提条件の確認
     check_prerequisites
 
-    # ステップ1.5: プロファイル読み込み
-    load_profile
-
-    # ステップ1.6: env.sh の自動読み込み（認証情報）
+    # ステップ1.5: env.sh の自動読み込み（認証情報 + レガシー TF_VAR）
     load_env_if_needed
+
+    # ステップ1.6: プロファイル読み込み（env.sh の値を上書きして最終構成を確定）
+    load_profile
     
     # ステップ2: 環境変数の確認
     check_environment

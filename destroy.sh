@@ -1123,8 +1123,8 @@ verify_terraform_cleanup() {
 run_verify_only() {
     print_banner
     check_prerequisites
-    load_profile
     load_env_if_needed
+    load_profile
     # ROSA / AWS 確認のため認証は推奨
     if ! command -v rosa &>/dev/null || rosa whoami >/dev/null 2>&1; then
         true
@@ -1149,11 +1149,11 @@ main() {
     # ステップ1: 前提条件の確認
     check_prerequisites
 
-    # ステップ1.5: プロファイル読み込み
-    load_profile
-
-    # ステップ1.6: env.sh の自動読み込み（認証情報）
+    # ステップ1.5: env.sh の自動読み込み（認証情報 + レガシー TF_VAR）
     load_env_if_needed
+
+    # ステップ1.6: プロファイル読み込み（env.sh の値を上書きして最終構成を確定）
+    load_profile
     
     # ステップ2: ROSA認証の確認
     ensure_rosa_auth
