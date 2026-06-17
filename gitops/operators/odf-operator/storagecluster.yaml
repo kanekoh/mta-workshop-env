@@ -1,0 +1,42 @@
+apiVersion: ocs.openshift.io/v1
+kind: StorageCluster
+metadata:
+  name: ocs-storagecluster
+  namespace: openshift-storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  manageNodes: false
+  monDataDirHostPath: /var/lib/rook
+  storageDeviceSets:
+    - name: ocs-deviceset
+      count: 1
+      dataPVCTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 512Gi
+          storageClassName: gp3-csi
+          volumeMode: Block
+      placement:
+        tolerations:
+          - key: node.ocs.openshift.io/storage
+            value: "true"
+            effect: NoSchedule
+      portable: true
+      replica: 3
+  placement:
+    all:
+      tolerations:
+        - key: node.ocs.openshift.io/storage
+          value: "true"
+          effect: NoSchedule
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: cluster.ocs.openshift.io/openshift-storage
+                  operator: Exists

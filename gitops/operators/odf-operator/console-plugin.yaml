@@ -1,0 +1,15 @@
+apiVersion: console.openshift.io/v1
+kind: ConsolePlugin
+metadata:
+  name: odf-console
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  displayName: ODF Console
+  backend:
+    type: Service
+    service:
+      name: odf-console-service
+      namespace: openshift-storage
+      port: 9001

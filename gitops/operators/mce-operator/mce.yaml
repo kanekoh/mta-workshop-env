@@ -1,0 +1,17 @@
+apiVersion: multicluster.openshift.io/v1
+kind: MultiClusterEngine
+metadata:
+  name: multiclusterengine
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  availabilityConfig: High
+  overrides:
+    components:
+      - name: hypershift
+        enabled: true
+      - name: hypershift-local-hosting
+        enabled: true
+      - name: local-cluster
+        enabled: true
