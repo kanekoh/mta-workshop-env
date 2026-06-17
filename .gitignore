@@ -41,6 +41,8 @@ Thumbs.db
 *.crt
 secrets/
 credentials/
+.hcp-sts-creds.json
+pull-secret.txt
 
 # Logs
 *.log
