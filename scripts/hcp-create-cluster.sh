@@ -131,6 +131,19 @@ prepare_aws_resources() {
                 "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
     fi
 
+    # Ensure bucket policy allows public read (required for OIDC discovery)
+    log_info "Setting public read policy on S3 bucket"
+    aws s3api put-bucket-policy --bucket "${S3_BUCKET_NAME}" --policy "{
+        \"Version\": \"2012-10-17\",
+        \"Statement\": [{
+            \"Sid\": \"AllowPublicRead\",
+            \"Effect\": \"Allow\",
+            \"Principal\": \"*\",
+            \"Action\": \"s3:GetObject\",
+            \"Resource\": \"arn:aws:s3:::${S3_BUCKET_NAME}/*\"
+        }]
+    }"
+
     # 2. Create IAM role for HCP CLI
     log_info "Creating IAM role: ${IAM_ROLE_NAME}"
     local trust_policy
