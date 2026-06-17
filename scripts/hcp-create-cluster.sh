@@ -28,11 +28,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# env.sh may have unbound variables; temporarily disable -u
+set +u
 source "${PROJECT_ROOT}/env.sh" 2>/dev/null || true
+set -u
 
 HCP_CLUSTER_NAME="${HCP_CLUSTER_NAME:-}"
 HCP_BASE_DOMAIN="${HCP_BASE_DOMAIN:-}"
-HCP_REGION="${HCP_REGION:-$(aws configure get region 2>/dev/null || echo 'ap-northeast-1')}"
+HCP_REGION="${HCP_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region 2>/dev/null || echo 'ap-northeast-1')}}"
 HCP_NODE_REPLICAS="${HCP_NODE_REPLICAS:-2}"
 HCP_RELEASE_IMAGE="${HCP_RELEASE_IMAGE:-}"
 HCP_NAMESPACE="${HCP_NAMESPACE:-clusters}"
@@ -51,6 +54,7 @@ log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
 validate_prerequisites() {
+    local require_hcp="${1:-false}"
     local missing=0
 
     if [[ -z "${HCP_CLUSTER_NAME}" ]]; then
@@ -62,12 +66,21 @@ validate_prerequisites() {
         missing=1
     fi
 
-    for cmd in aws oc hcp; do
+    for cmd in aws oc; do
         if ! command -v "$cmd" &>/dev/null; then
             log_error "Required command not found: $cmd"
             missing=1
         fi
     done
+
+    if [[ "${require_hcp}" == "true" ]]; then
+        if ! command -v hcp &>/dev/null; then
+            log_error "Required command not found: hcp"
+            log_error "Download it from the cluster:"
+            log_error "  oc get ConsoleCLIDownload hcp-cli-download -o jsonpath='{.spec.links[0].href}'"
+            missing=1
+        fi
+    fi
 
     if [[ $missing -ne 0 ]]; then
         echo ""
@@ -97,14 +110,20 @@ prepare_aws_resources() {
     log_info "AWS Account ID: ${account_id}"
 
     # 1. Create S3 bucket for OIDC
-    log_info "Creating S3 bucket: ${S3_BUCKET_NAME}"
+    log_info "Creating S3 bucket: ${S3_BUCKET_NAME} (region: ${HCP_REGION})"
     if aws s3api head-bucket --bucket "${S3_BUCKET_NAME}" 2>/dev/null; then
         log_warn "S3 bucket already exists: ${S3_BUCKET_NAME}"
     else
-        aws s3api create-bucket \
-            --bucket "${S3_BUCKET_NAME}" \
-            --region "${HCP_REGION}" \
-            --create-bucket-configuration LocationConstraint="${HCP_REGION}"
+        if [[ "${HCP_REGION}" == "us-east-1" ]]; then
+            aws s3api create-bucket \
+                --bucket "${S3_BUCKET_NAME}" \
+                --region "${HCP_REGION}"
+        else
+            aws s3api create-bucket \
+                --bucket "${S3_BUCKET_NAME}" \
+                --region "${HCP_REGION}" \
+                --create-bucket-configuration LocationConstraint="${HCP_REGION}"
+        fi
 
         aws s3api put-public-access-block \
             --bucket "${S3_BUCKET_NAME}" \
@@ -146,11 +165,29 @@ EOF
     # 3. Generate STS credentials file
     local sts_creds_file="${PROJECT_ROOT}/.hcp-sts-creds.json"
     log_info "Generating STS credentials: ${sts_creds_file}"
+
+    local access_key="${AWS_ACCESS_KEY_ID:-}"
+    local secret_key="${AWS_SECRET_ACCESS_KEY:-}"
+
+    # Fall back to aws configure if env vars are empty
+    if [[ -z "${access_key}" ]]; then
+        access_key="$(aws configure get aws_access_key_id 2>/dev/null || true)"
+    fi
+    if [[ -z "${secret_key}" ]]; then
+        secret_key="$(aws configure get aws_secret_access_key 2>/dev/null || true)"
+    fi
+
+    if [[ -z "${access_key}" || -z "${secret_key}" ]]; then
+        log_error "AWS credentials not found in environment or ~/.aws/credentials"
+        log_error "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or configure aws cli"
+        exit 1
+    fi
+
     cat > "${sts_creds_file}" <<EOF
 {
     "region": "${HCP_REGION}",
-    "aws_access_key_id": "${AWS_ACCESS_KEY_ID}",
-    "aws_secret_access_key": "${AWS_SECRET_ACCESS_KEY}"
+    "aws_access_key_id": "${access_key}",
+    "aws_secret_access_key": "${secret_key}"
 }
 EOF
     chmod 600 "${sts_creds_file}"
@@ -161,7 +198,7 @@ EOF
         --namespace local-cluster \
         --from-literal=bucket="${S3_BUCKET_NAME}" \
         --from-literal=region="${HCP_REGION}" \
-        --from-literal=credentials="$(printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "${AWS_ACCESS_KEY_ID}" "${AWS_SECRET_ACCESS_KEY}")" \
+        --from-literal=credentials="$(printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "${access_key}" "${secret_key}")" \
         --dry-run=client -o yaml | oc apply -f -
 
     log_info "=== AWS preparation complete ==="
@@ -178,17 +215,58 @@ EOF
 create_hosted_cluster() {
     log_info "=== Creating Hosted Cluster: ${HCP_CLUSTER_NAME} ==="
 
-    validate_prerequisites
+    validate_prerequisites true
 
     local account_id
     account_id=$(get_aws_account_id)
     local sts_creds_file="${PROJECT_ROOT}/.hcp-sts-creds.json"
     local role_arn="arn:aws:iam::${account_id}:role/${IAM_ROLE_NAME}"
 
-    if [[ ! -f "${sts_creds_file}" ]]; then
-        log_error "STS credentials file not found. Run 'prepare' first."
+    # Ensure AWS credentials are available (from env.sh)
+    if [[ -z "${AWS_ACCESS_KEY_ID:-}" || -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+        log_error "AWS credentials not available. Ensure env.sh exports AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
         exit 1
     fi
+    export AWS_REGION="${HCP_REGION}"
+
+    # Check pull secret exists before creating infra
+    local pull_secret="${HCP_PULL_SECRET:-${PROJECT_ROOT}/pull-secret.txt}"
+    if [[ ! -f "${pull_secret}" ]]; then
+        # Try common alternative locations
+        for alt in "${HOME}/.pull-secret.json" "${HOME}/pull-secret.txt" "${HOME}/Downloads/pull-secret.txt"; do
+            if [[ -f "${alt}" ]]; then
+                pull_secret="${alt}"
+                break
+            fi
+        done
+    fi
+    if [[ ! -f "${pull_secret}" ]]; then
+        log_error "Pull secret not found. Place it at: ${PROJECT_ROOT}/pull-secret.txt"
+        log_error "Download from: https://console.redhat.com/openshift/install/pull-secret"
+        log_error "Or set HCP_PULL_SECRET=/path/to/pull-secret.txt"
+        exit 1
+    fi
+
+    # Generate STS credentials file in AWS SDK format (as output by 'aws sts get-session-token')
+    log_info "Generating STS credentials file..."
+    local sts_output
+    sts_output=$(aws sts get-session-token --output json 2>&1) || {
+        log_warn "get-session-token failed, using static credentials format"
+        cat > "${sts_creds_file}" <<EOF
+{
+    "Credentials": {
+        "AccessKeyId": "${AWS_ACCESS_KEY_ID}",
+        "SecretAccessKey": "${AWS_SECRET_ACCESS_KEY}",
+        "SessionToken": "",
+        "Expiration": "2099-12-31T23:59:59Z"
+    }
+}
+EOF
+    }
+    if [[ -n "${sts_output}" && "${sts_output}" == *"Credentials"* ]]; then
+        echo "${sts_output}" > "${sts_creds_file}"
+    fi
+    chmod 600 "${sts_creds_file}"
 
     local cmd=(
         hcp create cluster aws
@@ -196,7 +274,7 @@ create_hosted_cluster() {
         --infra-id "${HCP_CLUSTER_NAME}"
         --base-domain "${HCP_BASE_DOMAIN}"
         --sts-creds "${sts_creds_file}"
-        --pull-secret "${PROJECT_ROOT}/pull-secret.txt"
+        --pull-secret "${pull_secret}"
         --region "${HCP_REGION}"
         --generate-ssh
         --node-pool-replicas "${HCP_NODE_REPLICAS}"
@@ -260,11 +338,24 @@ destroy_hosted_cluster() {
         exit 0
     fi
 
+    local account_id
+    account_id=$(get_aws_account_id)
+    local role_arn="arn:aws:iam::${account_id}:role/${IAM_ROLE_NAME}"
+
+    # Ensure AWS credentials for destroy
+    if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+        log_error "AWS credentials not available."
+        exit 1
+    fi
+    export AWS_REGION="${HCP_REGION}"
+
     hcp destroy cluster aws \
         --name "${HCP_CLUSTER_NAME}" \
         --namespace "${HCP_NAMESPACE}" \
         --sts-creds "${PROJECT_ROOT}/.hcp-sts-creds.json" \
         --infra-id "${HCP_CLUSTER_NAME}" \
+        --role-arn "${role_arn}" \
+        --base-domain "${HCP_BASE_DOMAIN}" \
         --region "${HCP_REGION}"
 
     log_info "Hosted Cluster destruction initiated."
@@ -288,11 +379,10 @@ main() {
 
     case "${action}" in
         prepare)
-            validate_prerequisites
+            validate_prerequisites false
             prepare_aws_resources
             ;;
         create)
-            validate_prerequisites
             create_hosted_cluster
             ;;
         status)
