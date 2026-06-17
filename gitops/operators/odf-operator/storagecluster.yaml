@@ -9,6 +9,14 @@ metadata:
 spec:
   manageNodes: false
   monDataDirHostPath: /var/lib/rook
+  monPVCTemplate:
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+      storageClassName: gp3-csi
   storageDeviceSets:
     - name: ocs-deviceset
       count: 1
@@ -28,6 +36,9 @@ spec:
             effect: NoSchedule
       portable: true
       replica: 3
+  multiCloudGateway:
+    dbStorageClassName: gp3-csi
+    reconcileStrategy: standalone
   placement:
     all:
       tolerations:
