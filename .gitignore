@@ -46,6 +46,7 @@ credentials/
 pull-secret.txt
 
 # Logs
+logs/
 *.log
 
 temp/

@@ -93,12 +93,22 @@ EOF
     esac
 done
 
-# ログファイルが指定されている場合、teeで出力をリダイレクト
+# 常にログを出力（logs/ ディレクトリに最新1回分を保持）
+mkdir -p "${SCRIPT_DIR}/logs"
+LATEST_LOG="${SCRIPT_DIR}/logs/destroy-latest.log"
+if [ -f "${LATEST_LOG}" ]; then
+    mv "${LATEST_LOG}" "${SCRIPT_DIR}/logs/destroy-previous.log"
+fi
+exec > >(tee "${LATEST_LOG}") 2>&1
+echo "========================================"
+echo "destroy.sh 実行ログ"
+echo "開始時刻: $(date)"
+echo "PROFILE: ${PROFILE:-未設定}"
+echo "========================================"
+
+# 追加のログファイルが指定されている場合
 if [ -n "$LOG_FILE" ]; then
-    exec > >(tee -a "$LOG_FILE") 2>&1
-    echo "ログファイル: $LOG_FILE"
-    echo "開始時刻: $(date)"
-    echo "========================================"
+    echo "追加ログファイル: $LOG_FILE"
 fi
 
 # set -e をコメントアウト（エラーを無視して続行するため）
@@ -175,10 +185,10 @@ check_prerequisites() {
 # プロファイル読み込み
 load_profile() {
     if [ -z "${PROFILE:-}" ]; then
-        log_warning "PROFILE が未設定です。デフォルト 'mta-full' を使用します。"
-        log_info "明示的に指定する場合: export PROFILE=\"<profile-name>\""
+        log_error "PROFILE が未設定です。削除するプロファイルを指定してください。"
+        log_info "使い方: export PROFILE=\"<profile-name>\" && ./destroy.sh"
         log_info "利用可能: $(ls "${SCRIPT_DIR}/profiles/"*.env 2>/dev/null | xargs -I{} basename {} .env | tr '\n' ' ')"
-        PROFILE="mta-full"
+        exit 1
     fi
 
     local profile_file="${SCRIPT_DIR}/profiles/${PROFILE}.env"

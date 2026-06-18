@@ -83,12 +83,23 @@ EOF
     esac
 done
 
-# ログファイルが指定されている場合、teeで出力をリダイレクト
+# 常にログを出力（logs/ ディレクトリに最新1回分を保持）
+mkdir -p "${SCRIPT_DIR}/logs"
+LATEST_LOG="${SCRIPT_DIR}/logs/deploy-latest.log"
+# 前回のログを1世代だけ保持
+if [ -f "${LATEST_LOG}" ]; then
+    mv "${LATEST_LOG}" "${SCRIPT_DIR}/logs/deploy-previous.log"
+fi
+exec > >(tee "${LATEST_LOG}") 2>&1
+echo "========================================"
+echo "deploy.sh 実行ログ"
+echo "開始時刻: $(date)"
+echo "PROFILE: ${PROFILE:-未設定}"
+echo "========================================"
+
+# 追加のログファイルが指定されている場合
 if [ -n "$LOG_FILE" ]; then
-    exec > >(tee -a "$LOG_FILE") 2>&1
-    echo "ログファイル: $LOG_FILE"
-    echo "開始時刻: $(date)"
-    echo "========================================"
+    echo "追加ログファイル: $LOG_FILE"
 fi
 
 set -e  # エラーが発生したら即座に終了
@@ -172,10 +183,10 @@ check_prerequisites() {
 # プロファイル読み込み
 load_profile() {
     if [ -z "${PROFILE:-}" ]; then
-        log_warning "PROFILE が未設定です。デフォルト 'mta-full' を使用します。"
-        log_info "明示的に指定する場合: export PROFILE=\"<profile-name>\""
+        log_error "PROFILE が未設定です。デプロイするプロファイルを指定してください。"
+        log_info "使い方: export PROFILE=\"<profile-name>\" && ./deploy.sh"
         log_info "利用可能: $(ls "${SCRIPT_DIR}/profiles/"*.env 2>/dev/null | xargs -I{} basename {} .env | tr '\n' ' ')"
-        PROFILE="mta-full"
+        exit 1
     fi
 
     local profile_file="${SCRIPT_DIR}/profiles/${PROFILE}.env"
@@ -198,6 +209,38 @@ load_env_if_needed() {
         else
             log_info "環境変数が既に設定されています。env.sh の自動読み込みをスキップします。"
         fi
+    fi
+}
+
+# ArgoCD App-of-Apps のパスがプロファイルの GITOPS_ENV と一致するか確認・修正
+reconcile_argocd_path() {
+    local expected_path="gitops/environments/${GITOPS_ENV:-mta}/apps"
+
+    # oc が使えない、またはクラスターに接続できない場合はスキップ
+    if ! command -v oc &>/dev/null; then
+        return 0
+    fi
+
+    local current_path
+    current_path=$(oc get applications.argoproj.io gitops-app-of-apps -n openshift-gitops -o jsonpath='{.spec.source.path}' 2>/dev/null) || return 0
+
+    if [ -z "$current_path" ]; then
+        return 0
+    fi
+
+    if [ "$current_path" != "$expected_path" ]; then
+        log_warning "ArgoCD App-of-Apps のパスがプロファイルと不一致:"
+        log_warning "  現在:   ${current_path}"
+        log_warning "  期待値: ${expected_path}"
+        log_info "ArgoCD App-of-Apps のパスを修正します..."
+        if oc patch applications.argoproj.io gitops-app-of-apps -n openshift-gitops \
+            --type=merge -p "{\"spec\":{\"source\":{\"path\":\"${expected_path}\"}}}" 2>/dev/null; then
+            log_success "ArgoCD App-of-Apps のパスを ${expected_path} に更新しました"
+        else
+            log_warning "ArgoCD App-of-Apps のパッチに失敗しました（新規デプロイの場合は無視可能）"
+        fi
+    else
+        log_info "ArgoCD App-of-Apps パス: ${current_path} (プロファイルと一致)"
     fi
 }
 
@@ -895,8 +938,12 @@ run_ansible() {
     fi
     
     # GitOps環境の設定（デフォルト: mta）
-    GITOPS_ENV="${GITOPS_ENV:-mta}"
-    log_info "GitOps環境: ${GITOPS_ENV}"
+    if [ -z "${GITOPS_ENV:-}" ]; then
+        log_warning "GITOPS_ENV が未設定です。プロファイルが正しく読み込まれていない可能性があります。"
+        log_warning "PROFILE=${PROFILE:-未設定}, フォールバック: GITOPS_ENV=mta"
+        GITOPS_ENV="mta"
+    fi
+    log_info "GitOps環境: ${GITOPS_ENV} (PROFILE=${PROFILE:-未設定})"
 
     # Ansible playbook 選択（ANSIBLE_PLAYBOOKS 変数で制御、未設定時は全実行）
     local ansible_extra_vars="gitops_env=${GITOPS_ENV}"
@@ -1006,6 +1053,9 @@ main() {
 
     # ステップ1.6: プロファイル読み込み（env.sh の値を上書きして最終構成を確定）
     load_profile
+
+    # ステップ1.7: ArgoCD App-of-Apps パス整合性チェック
+    reconcile_argocd_path
     
     # ステップ2: 環境変数の確認
     check_environment
