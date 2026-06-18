@@ -38,7 +38,6 @@ spec:
       replica: 3
   multiCloudGateway:
     dbStorageClassName: gp3-csi
-    reconcileStrategy: standalone
   placement:
     all:
       tolerations:
