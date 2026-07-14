@@ -80,6 +80,10 @@ cat > "$PROFILE_FILE" << EOF
 export PROFILE_NAME="${ENV_NAME}"
 export GITOPS_ENV="${ENV_NAME}"
 
+# --- クラスター識別 ---
+export TF_VAR_cluster_name="${ENV_NAME}"
+export TF_VAR_ocp_version="4.20.2"
+
 # --- クラスター構成 ---
 export CLUSTER_VIA="terraform"
 export TF_VAR_rosa_machine_type="m6a.2xlarge"

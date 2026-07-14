@@ -25,6 +25,7 @@ cd "$SCRIPT_DIR"
 LOG_FILE="${DEPLOY_LOG_FILE:-}"
 FORCE_DEPLOY=false
 CLUSTER_VIA="${CLUSTER_VIA:-terraform}"  # terraform | rosa-cli
+CLI_OCP_VERSION=""  # --version で指定された場合に保持
 
 # オプション解析
 while [[ $# -gt 0 ]]; do
@@ -43,6 +44,10 @@ while [[ $# -gt 0 ]]; do
             FORCE_DEPLOY=true
             shift
             ;;
+        --version)
+            CLI_OCP_VERSION="$2"
+            shift 2
+            ;;
         --cluster-via)
             CLUSTER_VIA="$2"
             if [[ "$CLUSTER_VIA" != "terraform" && "$CLUSTER_VIA" != "rosa-cli" ]]; then
@@ -56,6 +61,7 @@ while [[ $# -gt 0 ]]; do
 Usage: $0 [OPTIONS]
 
 Options:
+  --version <ver>         OCP version (e.g. 4.20.0). Overrides env.sh/profile
   --log-file <file>       Log output to specified file
   -l, --log               Log output to default file (deploy-YYYYMMDD-HHMMSS.log)
   --cluster-via <mode>    Cluster provisioner: 'terraform' (default) or 'rosa-cli'
@@ -65,8 +71,10 @@ Options:
 Environment Variables:
   DEPLOY_LOG_FILE      Log file path (overridden by --log-file option)
   CLUSTER_VIA          Cluster provisioner (overridden by --cluster-via option)
+  TF_VAR_ocp_version   OCP version (overridden by --version option)
 
 Examples:
+  $0 --version 4.18.0
   $0 --log
   $0 --log-file my-deploy.log
   $0 --force
@@ -1054,8 +1062,22 @@ main() {
     # ステップ1.6: プロファイル読み込み（env.sh の値を上書きして最終構成を確定）
     load_profile
 
+    # ステップ1.6.1: CLUSTER_NAME_PREFIX による名前結合
+    if [[ -n "${CLUSTER_NAME_PREFIX:-}" ]]; then
+        export TF_VAR_cluster_name="${CLUSTER_NAME_PREFIX}-${TF_VAR_cluster_name}"
+        log_info "クラスター名（prefix 付与）: ${TF_VAR_cluster_name}"
+    else
+        log_warning "CLUSTER_NAME_PREFIX 未設定。クラスター名: ${TF_VAR_cluster_name}"
+    fi
+
     # ステップ1.7: ArgoCD App-of-Apps パス整合性チェック
     reconcile_argocd_path
+
+    # ステップ1.8: CLI オプションによる上書き（env.sh/profile より優先）
+    if [ -n "${CLI_OCP_VERSION}" ]; then
+        export TF_VAR_ocp_version="${CLI_OCP_VERSION}"
+        log_info "OCP バージョンを CLI 指定値で上書き: ${TF_VAR_ocp_version}"
+    fi
     
     # ステップ2: 環境変数の確認
     check_environment

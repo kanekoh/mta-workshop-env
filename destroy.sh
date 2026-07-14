@@ -1135,6 +1135,15 @@ run_verify_only() {
     check_prerequisites
     load_env_if_needed
     load_profile
+
+    # CLUSTER_NAME_PREFIX による名前結合
+    if [[ -n "${CLUSTER_NAME_PREFIX:-}" ]]; then
+        export TF_VAR_cluster_name="${CLUSTER_NAME_PREFIX}-${TF_VAR_cluster_name}"
+        log_info "クラスター名（prefix 付与）: ${TF_VAR_cluster_name}"
+    else
+        log_warning "CLUSTER_NAME_PREFIX 未設定。クラスター名: ${TF_VAR_cluster_name}"
+    fi
+
     # ROSA / AWS 確認のため認証は推奨
     if ! command -v rosa &>/dev/null || rosa whoami >/dev/null 2>&1; then
         true
@@ -1164,6 +1173,14 @@ main() {
 
     # ステップ1.6: プロファイル読み込み（env.sh の値を上書きして最終構成を確定）
     load_profile
+
+    # ステップ1.6.1: CLUSTER_NAME_PREFIX による名前結合
+    if [[ -n "${CLUSTER_NAME_PREFIX:-}" ]]; then
+        export TF_VAR_cluster_name="${CLUSTER_NAME_PREFIX}-${TF_VAR_cluster_name}"
+        log_info "クラスター名（prefix 付与）: ${TF_VAR_cluster_name}"
+    else
+        log_warning "CLUSTER_NAME_PREFIX 未設定。クラスター名: ${TF_VAR_cluster_name}"
+    fi
     
     # ステップ2: ROSA認証の確認
     ensure_rosa_auth
