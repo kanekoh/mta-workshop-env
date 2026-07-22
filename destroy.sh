@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ###############################################################################
-# MTA for Developer Lightspeed ワークショップ環境削除スクリプト
+# ROSA HCP デモ環境削除スクリプト
 # 
 # このスクリプトは以下を実行します：
 # 1. Terraformを使用してROSA HCPクラスターを削除
@@ -143,7 +143,7 @@ print_banner() {
     echo -e "${RED}"
     cat << "EOF"
 ╔═══════════════════════════════════════════════════════════════╗
-║  MTA for Developer Lightspeed Workshop Environment            ║
+║  ROSA HCP Demo Environment                                    ║
 ║  Red Hat OpenShift for AWS (ROSA) Cluster Destruction         ║
 ╚═══════════════════════════════════════════════════════════════╝
 EOF
@@ -264,7 +264,7 @@ ensure_rosa_auth() {
 # 出力: "rosa-cli" | "terraform" | ""（ファイル未存在時）
 # 終了コード: 0=ファイルあり, 1=ファイルなし
 read_cluster_origin_provisioner() {
-    local metadata_file="${SCRIPT_DIR}/.mta-demo/cluster-origin.json"
+    local metadata_file="${SCRIPT_DIR}/.rosa-demo/cluster-origin.json"
 
     if [ ! -f "$metadata_file" ]; then
         echo ""
@@ -285,7 +285,7 @@ read_cluster_origin_provisioner() {
 
 # クラスター起源メタデータからクラスター名を読み取る（フォールバック: TF_VAR_cluster_name）
 read_cluster_origin_name() {
-    local metadata_file="${SCRIPT_DIR}/.mta-demo/cluster-origin.json"
+    local metadata_file="${SCRIPT_DIR}/.rosa-demo/cluster-origin.json"
     local name=""
 
     if [ -f "$metadata_file" ]; then
@@ -299,7 +299,7 @@ read_cluster_origin_name() {
     fi
 
     if [ -z "$name" ]; then
-        name="${TF_VAR_cluster_name:-mta-lightspeed}"
+        name="${TF_VAR_cluster_name:-rosa-demo}"
     fi
     echo "$name"
 }
@@ -311,14 +311,14 @@ get_cluster_name() {
     # プロジェクトルートに移動
     pushd "$SCRIPT_DIR" > /dev/null || {
         log_error "プロジェクトルートに移動できませんでした"
-        echo "mta-lightspeed"
+        echo "rosa-demo"
         return 1
     }
     
     # terraform/clusterディレクトリが存在するか確認
     if [ ! -d "terraform/cluster" ]; then
         log_warning "terraform/cluster ディレクトリが見つかりません。環境変数からクラスター名を取得します。"
-        cluster_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+        cluster_name="${TF_VAR_cluster_name:-rosa-demo}"
         popd > /dev/null
         echo "$cluster_name"
         return 0
@@ -327,7 +327,7 @@ get_cluster_name() {
     pushd terraform/cluster > /dev/null || {
         log_error "terraform/cluster に移動できませんでした"
         popd > /dev/null
-        echo "mta-lightspeed"
+        echo "rosa-demo"
         return 1
     }
     
@@ -343,7 +343,7 @@ get_cluster_name() {
     
     # 方法2: 環境変数から取得
     if [ -z "$cluster_name" ]; then
-        cluster_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+        cluster_name="${TF_VAR_cluster_name:-rosa-demo}"
     fi
     
     # 方法3: terraform.tfvarsから取得
@@ -353,7 +353,7 @@ get_cluster_name() {
     
     # デフォルト値
     if [ -z "$cluster_name" ]; then
-        cluster_name="mta-lightspeed"
+        cluster_name="rosa-demo"
     fi
     
     # スタックを2つ戻す（terraform/cluster → SCRIPT_DIR → 元のディレクトリ）
@@ -1022,7 +1022,7 @@ verify_terraform_cleanup() {
         cluster_name=$(get_cluster_name 2>/dev/null || echo "")
     fi
     if [ -z "$cluster_name" ]; then
-        cluster_name="mta-lightspeed"
+        cluster_name="rosa-demo"
     fi
 
     local tf_has_leftover=false
@@ -1196,10 +1196,10 @@ main() {
         _provisioner=$(read_cluster_origin_provisioner)
         if [ -n "$_provisioner" ]; then
             log_info "クラスター削除方式（メタデータ検出）: ${_provisioner}"
-            log_info "  参照: ${SCRIPT_DIR}/.mta-demo/cluster-origin.json"
+            log_info "  参照: ${SCRIPT_DIR}/.rosa-demo/cluster-origin.json"
         else
             # ヒューリスティック: terraform/cluster に state が無いのに ROSA にクラスターがある場合
-            local _heuristic_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+            local _heuristic_name="${TF_VAR_cluster_name:-rosa-demo}"
             local _has_tf_state=false
             if [ -f "${SCRIPT_DIR}/terraform/cluster/terraform.tfstate" ] || \
                [ -f "${SCRIPT_DIR}/terraform/cluster/.terraform/terraform.tfstate" ]; then
@@ -1210,7 +1210,7 @@ main() {
                rosa describe cluster -c "${_heuristic_name}" > /dev/null 2>&1; then
                 log_warning "ヒューリスティック検出: terraform/cluster に state がないが"
                 log_warning "  ROSA 上にクラスター '${_heuristic_name}' が存在します（CLI 構築の可能性）"
-                log_warning "  メタデータファイル (.mta-demo/cluster-origin.json) が見つかりません"
+                log_warning "  メタデータファイル (.rosa-demo/cluster-origin.json) が見つかりません"
                 echo ""
                 echo "  クラスター削除方式を選択してください:"
                 echo "    1) rosa-cli  (ROSA CLI で削除 / Terraform をスキップ)"
@@ -1297,7 +1297,7 @@ main() {
     echo "  - すべての関連リソース"
 
     # メタデータファイルが残っている場合は削除する
-    local _meta_file="${SCRIPT_DIR}/.mta-demo/cluster-origin.json"
+    local _meta_file="${SCRIPT_DIR}/.rosa-demo/cluster-origin.json"
     if [ -f "$_meta_file" ]; then
         rm -f "$_meta_file"
         log_info "クラスター起源メタデータを削除しました: ${_meta_file}"

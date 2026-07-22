@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ###############################################################################
-# MTA for Developer Lightspeed ワークショップ環境構築スクリプト
+# ROSA HCP デモ環境構築スクリプト
 # 
 # このスクリプトは以下を実行します：
 # 1. Terraformを使用してROSA HCPクラスターを構築
@@ -141,7 +141,7 @@ print_banner() {
     echo -e "${BLUE}"
     cat << "EOF"
 ╔═══════════════════════════════════════════════════════════════╗
-║  MTA for Developer Lightspeed Workshop Environment            ║
+║  ROSA HCP Demo Environment                                    ║
 ║  Red Hat OpenShift for AWS (ROSA) Cluster Setup               ║
 ╚═══════════════════════════════════════════════════════════════╝
 EOF
@@ -222,7 +222,7 @@ load_env_if_needed() {
 
 # ArgoCD App-of-Apps のパスがプロファイルの GITOPS_ENV と一致するか確認・修正
 reconcile_argocd_path() {
-    local expected_path="gitops/environments/${GITOPS_ENV:-mta}/apps"
+    local expected_path="gitops/environments/${GITOPS_ENV:-default}/apps"
 
     # oc が使えない、またはクラスターに接続できない場合はスキップ
     if ! command -v oc &>/dev/null; then
@@ -698,11 +698,11 @@ EOF
 
 # クラスター起源メタデータの書き込み
 # $1: cluster_name, $2: provisioner (デフォルト: rosa-cli)
-# メタデータは .mta-demo/cluster-origin.json に保存される（.gitignore 済み）
+# メタデータは .rosa-demo/cluster-origin.json に保存される（.gitignore 済み）
 write_cluster_origin_metadata() {
     local cluster_name="$1"
     local provisioner="${2:-rosa-cli}"
-    local metadata_dir="${SCRIPT_DIR}/.mta-demo"
+    local metadata_dir="${SCRIPT_DIR}/.rosa-demo"
     local metadata_file="${metadata_dir}/cluster-origin.json"
 
     mkdir -p "$metadata_dir"
@@ -759,7 +759,7 @@ deploy_cluster_rosa_cli() {
     fi
 
     # クラスター設定（環境変数優先）
-    local cluster_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+    local cluster_name="${TF_VAR_cluster_name:-rosa-demo}"
     local region="${TF_VAR_aws_region:-${AWS_DEFAULT_REGION:-ap-northeast-1}}"
     local ocp_version="${TF_VAR_ocp_version:-4.19}"
     local machine_type="${TF_VAR_rosa_machine_type:-m6a.2xlarge}"
@@ -948,8 +948,8 @@ run_ansible() {
     # GitOps環境の設定（デフォルト: mta）
     if [ -z "${GITOPS_ENV:-}" ]; then
         log_warning "GITOPS_ENV が未設定です。プロファイルが正しく読み込まれていない可能性があります。"
-        log_warning "PROFILE=${PROFILE:-未設定}, フォールバック: GITOPS_ENV=mta"
-        GITOPS_ENV="mta"
+        log_warning "PROFILE=${PROFILE:-未設定}, フォールバック: GITOPS_ENV=default"
+        GITOPS_ENV="default"
     fi
     log_info "GitOps環境: ${GITOPS_ENV} (PROFILE=${PROFILE:-未設定})"
 
@@ -1102,7 +1102,7 @@ main() {
         fi
 
         # 完了メッセージ（rosa-cli パス）
-        local cli_cluster_name="${TF_VAR_cluster_name:-mta-lightspeed}"
+        local cli_cluster_name="${TF_VAR_cluster_name:-rosa-demo}"
         echo ""
         log_success "======================================"
         log_success "  環境構築が完了しました！"
@@ -1120,7 +1120,7 @@ main() {
         echo "  3. クラスターにログイン"
         echo "     oc login <API_URL> -u cluster-admin -p <PASSWORD>"
         echo ""
-        echo "  削除時は destroy.sh がメタデータ (.mta-demo/cluster-origin.json) を読み"
+        echo "  削除時は destroy.sh がメタデータ (.rosa-demo/cluster-origin.json) を読み"
         echo "  terraform/cluster をスキップして ROSA CLI で削除します"
         echo ""
         return 0
