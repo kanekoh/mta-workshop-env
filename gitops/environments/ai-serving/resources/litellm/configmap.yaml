@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: litellm
+data:
+  config.yaml: |
+    model_list:
+      # --- 外部 API 例（API キーは Secret で注入） ---
+      # - model_name: gpt-4o
+      #   litellm_params:
+      #     model: openai/gpt-4o
+      #     api_key: os.environ/OPENAI_API_KEY
+
+      # --- RHOAI KServe / vLLM エンドポイント例 ---
+      # - model_name: my-model
+      #   litellm_params:
+      #     model: openai/my-model
+      #     api_base: http://my-model-predictor.my-project.svc.cluster.local/v1
+      #     api_key: "no-key"
+
+    general_settings:
+      master_key: os.environ/LITELLM_MASTER_KEY
