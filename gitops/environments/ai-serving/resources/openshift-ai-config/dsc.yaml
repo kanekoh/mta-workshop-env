@@ -1,4 +1,4 @@
-apiVersion: datasciencecluster.opendatahub.io/v1
+apiVersion: datasciencecluster.opendatahub.io/v2
 kind: DataScienceCluster
 metadata:
   name: default-dsc
@@ -9,39 +9,35 @@ metadata:
     app.kubernetes.io/name: datasciencecluster
     app.kubernetes.io/part-of: rhods-operator
   annotations:
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,ServerSideApply=true
 spec:
   components:
-    codeflare:
+    dashboard:
       managementState: Managed
     kserve:
-      nim:
-        managementState: Managed
+      managementState: Managed
       modelsAsService:
         managementState: Managed
+      nim:
+        managementState: Managed
       rawDeploymentServiceConfig: Headed
+    workbenches:
       managementState: Managed
-    modelregistry:
-      registriesNamespace: rhoai-model-registries
-      managementState: Removed
-    feastoperator:
-      managementState: Removed
-    trustyai:
+      workbenchNamespace: rhods-notebooks
+    aipipelines:
       managementState: Managed
     ray:
       managementState: Managed
-    kueue:
-      managementState: Removed
-    workbenches:
-      workbenchNamespace: rhods-notebooks
-      managementState: Managed
-    dashboard:
-      managementState: Managed
-    modelmeshserving:
-      managementState: Managed
-    llamastackoperator:
-      managementState: Removed
-    datasciencepipelines:
+    trustyai:
       managementState: Managed
     trainingoperator:
       managementState: Managed
+    kueue:
+      managementState: Removed
+    modelregistry:
+      managementState: Removed
+      registriesNamespace: rhoai-model-registries
+    feastoperator:
+      managementState: Removed
+    llamastackoperator:
+      managementState: Removed
