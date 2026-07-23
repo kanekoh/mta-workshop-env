@@ -10,13 +10,11 @@ metadata:
     opendatahub.io/dashboard: "true"
 spec:
   predictor:
-    imagePullSecrets:
-      - name: rh-registry-pull-secret
     model:
       modelFormat:
         name: vLLM
       runtime: vllm-runtime
-      storageUri: oci://registry.redhat.io/rhai/modelcar-granite-3-3-2b-instruct:3.0
+      storageUri: oci://quay.io/redhat-ai-services/modelcar-catalog:granite-3.3-2b-instruct
     tolerations:
       - key: nvidia.com/gpu
         operator: Exists
