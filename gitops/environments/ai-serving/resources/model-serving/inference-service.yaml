@@ -10,6 +10,8 @@ metadata:
     opendatahub.io/dashboard: "true"
 spec:
   predictor:
+    imagePullSecrets:
+      - name: rh-registry-pull-secret
     model:
       modelFormat:
         name: vLLM
