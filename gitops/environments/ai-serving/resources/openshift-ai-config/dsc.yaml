@@ -17,6 +17,8 @@ spec:
     kserve:
       nim:
         managementState: Managed
+      modelsAsService:
+        managementState: Managed
       rawDeploymentServiceConfig: Headed
       managementState: Managed
     modelregistry:

@@ -1,18 +1,38 @@
 # ai-serving 環境構築ノート
 
-RHOAI + LiteLLM のモデルサービング環境。構築時に遭遇した考慮点を記録する。
+**目的**: LiteLLM vs MaaS Gateway の比較検証環境
+
+RHOAI + RHCL + LiteLLM のモデルサービング環境。構築時に遭遇した考慮点を記録する。
 
 ## コンポーネント構成
 
-| コンポーネント | バージョン | 備考 |
+| コンポーネント | バージョン / チャネル | 備考 |
 |---|---|---|
-| OCP (ROSA HCP) | 4.22.x | |
+| OCP (ROSA HCP) | 4.22.x | クラスター名: ai-srv（32文字制限対応） |
 | RHOAI | 3.4.2 (stable-3.x) | fast-3.x は 3.3.1 止まりなので注意 |
-| cert-manager | stable-v1 | RHOAI 3.x の必須依存 |
+| RHCL | 1.4.1 (stable) | MaaS / TokenRateLimitPolicy に必須 |
+| cert-manager | stable-v1 | RHOAI 3.x + RHCL の共通依存 |
 | NFD Operator | - | GPU ノード検出用 |
 | NVIDIA GPU Operator | - | GPU ドライバ・ランタイム |
-| LiteLLM | main-latest (non_root) | AI Gateway |
+| LiteLLM | main-latest (non_root) | AI Gateway（比較対象） |
 | PostgreSQL | 16 (RHEL9) | LiteLLM のバックエンド DB |
+| Granite 3.3 2B | ModelCar OCI | テスト用モデル（g6.xlarge 16GB VRAM 対応） |
+
+## ArgoCD Application 構成
+
+```
+sync-wave  0: cert-manager, nfd-operator, nvidia-operator
+sync-wave  5: openshift-ai-operator, rhcl-operator
+sync-wave 10: openshift-ai-config (DSC)
+sync-wave 15: model-serving, litellm
+sync-wave 20: openshift-ai-post (AcceleratorProfile)
+```
+
+## DSC の MaaS 設定
+
+`kserve.modelsAsService.managementState: Managed` を設定。
+RHCL (Kuadrant) がインストールされていないと Warning が出るが、
+RHCL インストール後に自動的に連携される。
 
 ## RHOAI チャネル選択
 
