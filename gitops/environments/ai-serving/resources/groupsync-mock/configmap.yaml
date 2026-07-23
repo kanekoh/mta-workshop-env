@@ -5,6 +5,7 @@ metadata:
   namespace: groupsync-mock
 data:
   nginx.conf: |
+    pid /tmp/nginx.pid;
     events {}
     http {
       default_type application/json;
