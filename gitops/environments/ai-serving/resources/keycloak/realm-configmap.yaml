@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-import
+  namespace: keycloak
+data:
+  maas-test-realm.json: |
+    {
+      "realm": "maas-test",
+      "enabled": true,
+      "registrationAllowed": false,
+      "loginWithEmailAllowed": true,
+      "duplicateEmailsAllowed": false,
+      "sslRequired": "none",
+      "groups": [
+        {
+          "name": "premium",
+          "path": "/premium"
+        },
+        {
+          "name": "basic",
+          "path": "/basic"
+        }
+      ],
+      "defaultDefaultClientScopes": ["openid", "email", "profile", "roles", "groups"],
+      "clientScopes": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true",
+            "display.on.consent.screen": "false"
+          },
+          "protocolMappers": [
+            {
+              "name": "groups",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-group-membership-mapper",
+              "consentRequired": false,
+              "config": {
+                "full.path": "false",
+                "introspection.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "groups"
+              }
+            }
+          ]
+        }
+      ],
+      "clients": [
+        {
+          "clientId": "maas-gateway",
+          "name": "MaaS Gateway Client",
+          "enabled": true,
+          "publicClient": false,
+          "directAccessGrantsEnabled": true,
+          "standardFlowEnabled": true,
+          "serviceAccountsEnabled": false,
+          "secret": "maas-gateway-secret",
+          "redirectUris": ["*"],
+          "webOrigins": ["*"],
+          "defaultClientScopes": ["openid", "email", "profile", "roles", "groups"],
+          "protocolMappers": [
+            {
+              "name": "email-claim",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-attribute-mapper",
+              "config": {
+                "user.attribute": "email",
+                "claim.name": "email",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "introspection.token.claim": "true"
+              }
+            },
+            {
+              "name": "upn-claim",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-attribute-mapper",
+              "config": {
+                "user.attribute": "username",
+                "claim.name": "upn",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "introspection.token.claim": "true"
+              }
+            }
+          ]
+        }
+      ],
+      "users": [
+        {
+          "username": "premium-user1",
+          "email": "premium-user1@test.example",
+          "emailVerified": true,
+          "enabled": true,
+          "firstName": "Premium",
+          "lastName": "User1",
+          "groups": ["premium"],
+          "credentials": [
+            {
+              "type": "password",
+              "value": "test1234",
+              "temporary": false
+            }
+          ]
+        },
+        {
+          "username": "premium-user2",
+          "email": "premium-user2@test.example",
+          "emailVerified": true,
+          "enabled": true,
+          "firstName": "Premium",
+          "lastName": "User2",
+          "groups": ["premium"],
+          "credentials": [
+            {
+              "type": "password",
+              "value": "test1234",
+              "temporary": false
+            }
+          ]
+        },
+        {
+          "username": "basic-user1",
+          "email": "basic-user1@test.example",
+          "emailVerified": true,
+          "enabled": true,
+          "firstName": "Basic",
+          "lastName": "User1",
+          "groups": ["basic"],
+          "credentials": [
+            {
+              "type": "password",
+              "value": "test1234",
+              "temporary": false
+            }
+          ]
+        },
+        {
+          "username": "basic-user2",
+          "email": "basic-user2@test.example",
+          "emailVerified": true,
+          "enabled": true,
+          "firstName": "Basic",
+          "lastName": "User2",
+          "groups": ["basic"],
+          "credentials": [
+            {
+              "type": "password",
+              "value": "test1234",
+              "temporary": false
+            }
+          ]
+        }
+      ]
+    }

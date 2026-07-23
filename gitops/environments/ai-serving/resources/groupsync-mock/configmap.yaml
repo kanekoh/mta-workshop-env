@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: groupsync-data
+  namespace: groupsync-mock
+data:
+  nginx.conf: |
+    events {}
+    http {
+      default_type application/json;
+      server {
+        listen 8080;
+
+        location /group_conditions/GRP-PREMIUM {
+          return 200 '{
+            "group_id": "GRP-PREMIUM",
+            "group_name": "AI Premium Users",
+            "tier": "premium",
+            "members": [
+              {"email_address": "premium-user1@test.example", "display_name": "Premium User1"},
+              {"email_address": "premium-user2@test.example", "display_name": "Premium User2"}
+            ]
+          }';
+        }
+
+        location /group_conditions/GRP-BASIC {
+          return 200 '{
+            "group_id": "GRP-BASIC",
+            "group_name": "AI Basic Users",
+            "tier": "basic",
+            "members": [
+              {"email_address": "basic-user1@test.example", "display_name": "Basic User1"},
+              {"email_address": "basic-user2@test.example", "display_name": "Basic User2"}
+            ]
+          }';
+        }
+
+        location /healthz {
+          return 200 '{"status": "ok"}';
+        }
+
+        location / {
+          return 404 '{"error": "not_found", "message": "Group not found"}';
+        }
+      }
+    }
