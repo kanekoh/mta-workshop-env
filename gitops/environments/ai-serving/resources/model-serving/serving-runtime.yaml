@@ -19,7 +19,7 @@ spec:
       name: vLLM
   containers:
     - name: kserve-container
-      image: quay.io/modh/vllm@sha256:f501515b8e34d8d5c1a93b2a31e11db9f57e1e36eca0a24e5e1cf3b73e3df11f
+      image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:5800e12b2a465f15961fcf34b645d79ed4f91ec9161eab22b1205d12682183c8
       command:
         - python
         - -m
