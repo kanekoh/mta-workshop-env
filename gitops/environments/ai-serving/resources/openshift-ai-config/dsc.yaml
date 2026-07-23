@@ -18,12 +18,6 @@ spec:
       nim:
         managementState: Managed
       rawDeploymentServiceConfig: Headed
-      serving:
-        ingressGateway:
-          certificate:
-            type: OpenshiftDefaultIngress
-        managementState: Removed
-        name: knative-serving
       managementState: Managed
     modelregistry:
       registriesNamespace: rhoai-model-registries
