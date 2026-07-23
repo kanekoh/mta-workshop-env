@@ -13,27 +13,11 @@ data:
         listen 8080;
 
         location /group_conditions/GRP-PREMIUM {
-          return 200 '{
-            "group_id": "GRP-PREMIUM",
-            "group_name": "AI Premium Users",
-            "tier": "premium",
-            "members": [
-              {"email_address": "premium-user1@test.example", "display_name": "Premium User1"},
-              {"email_address": "premium-user2@test.example", "display_name": "Premium User2"}
-            ]
-          }';
+          return 200 '{"data":{"items":{"members":[{"email_address":"premium-user1@test.example","r_kid_email_address":"premium-user1.kid@test.example"},{"email_address":"premium-user2@test.example","r_kid_email_address":null}]}}}';
         }
 
         location /group_conditions/GRP-BASIC {
-          return 200 '{
-            "group_id": "GRP-BASIC",
-            "group_name": "AI Basic Users",
-            "tier": "basic",
-            "members": [
-              {"email_address": "basic-user1@test.example", "display_name": "Basic User1"},
-              {"email_address": "basic-user2@test.example", "display_name": "Basic User2"}
-            ]
-          }';
+          return 200 '{"data":{"items":{"members":[{"email_address":"basic-user1@test.example","r_kid_email_address":"basic-user1.kid@test.example"},{"email_address":"basic-user2@test.example","r_kid_email_address":null}]}}}';
         }
 
         location /healthz {
