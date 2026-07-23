@@ -1,0 +1,46 @@
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceServiceConfig
+metadata:
+  name: custom-nvidia-cuda-gpu
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+    openshift.io/display-name: "vLLM NVIDIA CUDA GPU (with GPU resources)"
+    openshift.io/description: >-
+      Custom LLMInferenceServiceConfig with GPU resource requests/limits.
+      Use this template instead of the default nvidia-cuda template.
+  labels:
+    app.kubernetes.io/part-of: kserve
+    opendatahub.io/config-type: accelerator
+spec:
+  template:
+    containers:
+      - name: main
+        image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:5800e12b2a465f15961fcf34b645d79ed4f91ec9161eab22b1205d12682183c8
+        args:
+          - "--port=8080"
+          - "--distributed-executor-backend=mp"
+          - "--max-model-len=4096"
+        env:
+          - name: HF_HUB_CACHE
+            value: /tmp
+          - name: HF_HOME
+            value: /tmp
+        ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: 12Gi
+            nvidia.com/gpu: "1"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule

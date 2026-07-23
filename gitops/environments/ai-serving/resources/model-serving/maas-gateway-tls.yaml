@@ -1,0 +1,28 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: maas-selfsigned-issuer
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: maas-default-gateway-tls
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  secretName: maas-default-gateway-tls
+  issuerRef:
+    name: maas-selfsigned-issuer
+    kind: Issuer
+  dnsNames:
+    - "*.apps.rosa.hk-ai-srv.frt2.p3.openshiftapps.com"
+  duration: 8760h   # 1 year
+  renewBefore: 720h # 30 days
