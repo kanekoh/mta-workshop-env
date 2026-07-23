@@ -5,6 +5,7 @@ metadata:
   namespace: model-serving
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    alpha.maas.opendatahub.io/tiers: '[]'
 spec:
   baseRefs:
     - name: custom-nvidia-cuda-gpu
@@ -12,3 +13,9 @@ spec:
     name: granite-3-3-2b-instruct
     uri: oci://quay.io/redhat-ai-services/modelcar-catalog:granite-3.3-2b-instruct
   replicas: 1
+  router:
+    route: {}
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
