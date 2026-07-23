@@ -18,6 +18,17 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: model-serving
+  ignoreDifferences:
+    - group: serving.kserve.io
+      kind: InferenceService
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/predictor/model/runtime
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/listeners
   syncPolicy:
     automated:
       prune: true
@@ -25,6 +36,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 10
       backoff:
