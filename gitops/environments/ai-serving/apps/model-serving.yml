@@ -20,10 +20,10 @@ spec:
     namespace: model-serving
   ignoreDifferences:
     - group: serving.kserve.io
-      kind: InferenceService
+      kind: LLMInferenceService
       jsonPointers:
         - /metadata/annotations
-        - /spec/predictor/model/runtime
+        - /status
     - group: gateway.networking.k8s.io
       kind: Gateway
       jsonPointers:
