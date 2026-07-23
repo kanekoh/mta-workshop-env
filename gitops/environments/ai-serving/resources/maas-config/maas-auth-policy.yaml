@@ -1,0 +1,14 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSAuthPolicy
+metadata:
+  name: granite-2b-auth
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  subjects:
+    groups:
+      - name: system:authenticated
+  modelRefs:
+    - name: granite-2b
+      namespace: model-serving

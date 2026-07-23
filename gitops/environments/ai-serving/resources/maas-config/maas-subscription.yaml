@@ -1,0 +1,17 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSSubscription
+metadata:
+  name: granite-2b-subscription
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  owner:
+    groups:
+      - name: system:authenticated
+  modelRefs:
+    - name: granite-2b
+      namespace: model-serving
+      tokenRateLimits:
+        - limit: 1000000
+          window: "1h"
