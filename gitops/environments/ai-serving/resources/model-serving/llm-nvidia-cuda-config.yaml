@@ -18,19 +18,6 @@ spec:
     containers:
       - name: main
         image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:5800e12b2a465f15961fcf34b645d79ed4f91ec9161eab22b1205d12682183c8
-        args:
-          - "--port=8080"
-          - "--distributed-executor-backend=mp"
-          - "--max-model-len=4096"
-        env:
-          - name: HF_HUB_CACHE
-            value: /tmp
-          - name: HF_HOME
-            value: /tmp
-        ports:
-          - containerPort: 8080
-            name: http
-            protocol: TCP
         resources:
           requests:
             cpu: "2"

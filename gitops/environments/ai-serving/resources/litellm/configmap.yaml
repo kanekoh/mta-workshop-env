@@ -9,8 +9,9 @@ data:
       - model_name: granite-2b
         litellm_params:
           model: openai/granite-3-3-2b-instruct
-          api_base: http://granite-2b-predictor.model-serving.svc.cluster.local/v1
+          api_base: https://granite-2b-kserve-workload-svc.model-serving.svc.cluster.local:8000/v1
           api_key: "no-key"
+          ssl_verify: false
 
     general_settings:
       master_key: os.environ/LITELLM_MASTER_KEY
