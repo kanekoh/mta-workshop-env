@@ -1,0 +1,16 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: Tenant
+metadata:
+  name: default-tenant
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  externalOIDC:
+    clientId: maas-gateway
+    # NOTE: issuerUrl はクラスター再構築時に Keycloak Route の FQDN に合わせて更新すること
+    issuerUrl: https://keycloak-keycloak.apps.rosa.hk-ai-srv.frt2.p3.openshiftapps.com/realms/maas-test
+    ttl: 300
+  gatewayRef:
+    name: maas-default-gateway
+    namespace: openshift-ingress
