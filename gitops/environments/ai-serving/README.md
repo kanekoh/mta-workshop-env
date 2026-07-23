@@ -130,6 +130,76 @@ resources:
 ghcr.io/berriai/litellm-non_root:main-latest
 ```
 
+## MaaS Gateway 自動生成リソース
+
+MaaS controller は MaaSAuthPolicy / MaaSSubscription から以下のリソースを自動生成する。
+**これらは GitOps に入れない**（controller が管理するため）が、構造を理解しておく必要がある。
+
+### AuthPolicy (Kuadrant)
+
+MaaSAuthPolicy → AuthPolicy `maas-auth-{model}` が自動生成される。
+
+認証方式（authentication）:
+
+| 名前 | 方式 | 優先度 | 条件 |
+|---|---|---|---|
+| `api-keys` | Plain (Authorization ヘッダー) | 0 | `Bearer sk-oai-*` にマッチ |
+| `kubernetes-tokens` | TokenReview | 1 | `/v1/models` パス + Bearer |
+| `oidc-identities` | JWT (Keycloak OIDC) | 2 | `/v1/models` パス + JWT 形式 |
+
+メタデータ（metadata）— 外部 HTTP コール:
+
+| 名前 | 用途 | コール先 |
+|---|---|---|
+| `apiKeyValidation` | MaaS API Key 検証 | `maas-api.../internal/v1/api-keys/validate` |
+| `subscription-info` | サブスクリプション選択 | `maas-api.../internal/v1/subscriptions/select` |
+
+`subscription-info` のユーザー識別ロジック:
+```
+username = apiKeyValidation.username
+         | preferred_username    ← JWT クレーム
+         | sub                   ← JWT sub クレーム
+         | user.username         ← K8s token
+groups   = apiKeyValidation.groups
+         | identity.groups       ← JWT groups クレーム ★EntraID では取れない
+         | identity.user.groups  ← K8s token groups
+```
+
+OPA rego（authorization）:
+```rego
+allow { auth.metadata.apiKeyValidation.valid == true }   # API Key
+allow { auth.identity.user.username != "" }               # K8s Token
+allow { auth.identity.sub != "" }                         # OIDC JWT
+```
+
+### TokenRateLimitPolicy (Kuadrant)
+
+MaaSSubscription → TokenRateLimitPolicy `maas-trlp-{model}` が自動生成される。
+
+```
+# MaaSSubscription (GitOps で管理)     →  TokenRateLimitPolicy (自動生成)
+granite-2b-premium  (priority:10)     →  limit: 1,000,000 tokens/h
+granite-2b-basic    (priority:5)      →  limit:   100,000 tokens/h
+granite-2b-subscription (priority:0)  →  limit: 1,000,000 tokens/h (fallback)
+```
+
+ティア判定は `auth.identity.selected_subscription_key` で行われ、
+MaaSSubscription の `owner.groups` と JWT の `groups` クレームを照合する。
+
+### HTTPRoute（パス構造）
+
+LLMInferenceService + MaaSModelRef → HTTPRoute `{model}-kserve-route` が自動生成される。
+
+| MaaS Gateway パス | 書き換え先 (vLLM) |
+|---|---|
+| `/{namespace}/{model}/v1/chat/completions` | → `/v1/chat/completions` |
+| `/{namespace}/{model}/v1/completions` | → `/v1/completions` |
+| `/{namespace}/{model}/v1/responses` | → `/v1/responses` |
+| `/{namespace}/{model}/**` (catch-all) | → `/` |
+
+LiteLLM 互換 (`/v1/chat/completions`) と MaaS Gateway のパス差異は、
+Envoy Lua filter 等で変換可能（検証後に実装を検討）。
+
 ## ROSA HCP 固有
 
 ### operator_role_prefix の 32 文字制限
