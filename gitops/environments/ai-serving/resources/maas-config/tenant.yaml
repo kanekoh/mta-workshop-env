@@ -19,5 +19,5 @@ spec:
     metrics:
       captureOrganization: true
       captureUser: true
-      captureGroup: true
+      captureGroup: false
       captureModelUsage: true
