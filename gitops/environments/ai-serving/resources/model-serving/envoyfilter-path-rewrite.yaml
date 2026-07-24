@@ -1,0 +1,64 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: claude-code-path-rewrite
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  workloadSelector:
+    labels:
+      gateway.networking.k8s.io/gateway-name: maas-default-gateway
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.wasm
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.lua
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            defaultSourceCode:
+              inlineString: |
+                local MODEL_ROUTE_MAP = {
+                  ["granite-3-3-2b-instruct"] = "granite-2b",
+                  ["granite-3.3-2b-instruct"] = "granite-2b",
+                }
+
+                function envoy_on_request(request_handle)
+                  local path = request_handle:headers():get(":path")
+                  if not path then return end
+                  if not (path:match("^/v1/messages") or
+                          path:match("^/v1/chat/completions") or
+                          path:match("^/v1/completions")) then
+                    return
+                  end
+                  if path:match("^/model%-serving/") then return end
+
+                  local body = request_handle:body():getBytes(0, request_handle:body():length())
+                  if not body then return end
+
+                  local model = body:match('"model"%s*:%s*"([^"]+)"')
+                  if not model then
+                    request_handle:respond({[":status"] = "400"},
+                      '{"error":"model field is required in request body for path-based routing"}')
+                    return
+                  end
+
+                  local route_name = MODEL_ROUTE_MAP[model]
+                  if not route_name then
+                    route_name = model
+                  end
+
+                  local new_path = "/model-serving/" .. route_name .. path
+                  request_handle:headers():replace(":path", new_path)
+                  request_handle:clearRouteCache()
+                end
