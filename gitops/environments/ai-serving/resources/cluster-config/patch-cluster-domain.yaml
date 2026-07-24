@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: patch-cluster-domain
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      serviceAccountName: cluster-config-patcher
+      restartPolicy: Never
+      containers:
+        - name: patch
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+
+              DOMAIN=$(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
+              echo "Detected apps domain: ${DOMAIN}"
+
+              KC_ROUTE=$(oc get route keycloak -n keycloak -o jsonpath='{.spec.host}' 2>/dev/null || echo "keycloak-keycloak.${DOMAIN}")
+              ISSUER_URL="https://${KC_ROUTE}/realms/maas-test"
+              echo "Keycloak issuer URL: ${ISSUER_URL}"
+
+              echo "Patching Tenant default-tenant ..."
+              oc patch tenant default-tenant -n models-as-a-service --type merge -p \
+                "{\"spec\":{\"externalOIDC\":{\"issuerUrl\":\"${ISSUER_URL}\"}}}"
+
+              echo "Patching Certificate maas-default-gateway-tls ..."
+              oc patch certificate maas-default-gateway-tls -n openshift-ingress --type merge -p \
+                "{\"spec\":{\"dnsNames\":[\"*.${DOMAIN}\"]}}"
+
+              echo "Done. Cluster domain configuration applied."
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi

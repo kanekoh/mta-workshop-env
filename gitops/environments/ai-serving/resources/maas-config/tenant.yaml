@@ -8,8 +8,8 @@ metadata:
 spec:
   externalOIDC:
     clientId: maas-gateway
-    # NOTE: issuerUrl はクラスター再構築時に Keycloak Route の FQDN に合わせて更新すること
-    issuerUrl: https://keycloak-keycloak.apps.rosa.hk-ai-srv.hcrr.p3.openshiftapps.com/realms/maas-test
+    # PostSync Hook Job (cluster-config) が実際の Keycloak Route FQDN に自動パッチする
+    issuerUrl: https://keycloak-keycloak.placeholder.cluster.local/realms/maas-test
     ttl: 300
   gatewayRef:
     name: maas-default-gateway

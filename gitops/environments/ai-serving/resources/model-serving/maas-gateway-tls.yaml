@@ -22,7 +22,8 @@ spec:
   issuerRef:
     name: maas-selfsigned-issuer
     kind: Issuer
+  # PostSync Hook Job (cluster-config) が実際の apps ドメインに自動パッチする
   dnsNames:
-    - "*.apps.rosa.hk-ai-srv.hcrr.p3.openshiftapps.com"
+    - "*.placeholder.cluster.local"
   duration: 8760h   # 1 year
   renewBefore: 720h # 30 days

@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-config-patcher
+rules:
+  - apiGroups: ["config.openshift.io"]
+    resources: ["ingresses"]
+    verbs: ["get"]
+  - apiGroups: ["maas.opendatahub.io"]
+    resources: ["tenants"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-config-patcher
+subjects:
+  - kind: ServiceAccount
+    name: cluster-config-patcher
+    namespace: models-as-a-service
+roleRef:
+  kind: ClusterRole
+  name: cluster-config-patcher
+  apiGroup: rbac.authorization.k8s.io
