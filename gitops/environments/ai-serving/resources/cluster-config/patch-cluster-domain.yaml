@@ -69,6 +69,21 @@ spec:
                 echo "SKIP: Authorino Deployment not found"
               fi
 
+              # --- OdhDashboardConfig: MaaS Dashboard flags ---
+              if oc get odhdashboardconfig odh-dashboard-config -n redhat-ods-applications &>/dev/null; then
+                CURRENT_MAAS=$(oc get odhdashboardconfig odh-dashboard-config -n redhat-ods-applications \
+                  -o jsonpath='{.spec.dashboardConfig.modelAsService}' 2>/dev/null)
+                if [ "$CURRENT_MAAS" = "true" ]; then
+                  echo "SKIP: OdhDashboardConfig MaaS flags already enabled"
+                else
+                  echo "Enabling MaaS Dashboard flags ..."
+                  oc patch odhdashboardconfig odh-dashboard-config -n redhat-ods-applications --type merge -p \
+                    '{"spec":{"dashboardConfig":{"modelAsService":true,"genAiStudio":true,"maasAuthPolicies":true,"observabilityDashboard":true,"vLLMDeploymentOnMaaS":true}}}'
+                fi
+              else
+                echo "SKIP: OdhDashboardConfig not found"
+              fi
+
               # --- maas-ui: MAAS_API_URL workaround (KCS 7143361) ---
               if oc get deploy rhods-dashboard -n redhat-ods-applications &>/dev/null; then
                 GW_ADDR=$(oc get gateway maas-default-gateway -n openshift-ingress \

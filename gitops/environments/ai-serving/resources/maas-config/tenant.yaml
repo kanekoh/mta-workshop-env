@@ -14,3 +14,10 @@ spec:
   gatewayRef:
     name: maas-default-gateway
     namespace: openshift-ingress
+  telemetry:
+    enabled: true
+    metrics:
+      captureOrganization: true
+      captureUser: true
+      captureGroup: true
+      captureModelUsage: true
