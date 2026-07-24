@@ -11,11 +11,6 @@ spec:
     namespace: redhat-ods-monitoring
     metrics:
       replicas: 1
-      resources:
-        cpulimit: 500m
-        cpurequest: 100m
-        memorylimit: 512Mi
-        memoryrequest: 256Mi
       storage:
         size: 5Gi
         retention: 15d
