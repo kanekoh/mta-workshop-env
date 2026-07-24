@@ -17,7 +17,7 @@ spec:
   telemetry:
     enabled: true
     metrics:
-      captureOrganization: true
+      captureOrganization: false
       captureUser: false
       captureGroup: false
       captureModelUsage: true
