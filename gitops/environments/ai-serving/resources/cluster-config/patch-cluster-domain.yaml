@@ -27,13 +27,21 @@ spec:
               ISSUER_URL="https://${KC_ROUTE}/realms/maas-test"
               echo "Keycloak issuer URL: ${ISSUER_URL}"
 
-              echo "Patching Tenant default-tenant ..."
-              oc patch tenant default-tenant -n models-as-a-service --type merge -p \
-                "{\"spec\":{\"externalOIDC\":{\"issuerUrl\":\"${ISSUER_URL}\"}}}"
+              if oc get tenant default-tenant -n models-as-a-service &>/dev/null; then
+                echo "Patching Tenant default-tenant ..."
+                oc patch tenant default-tenant -n models-as-a-service --type merge -p \
+                  "{\"spec\":{\"externalOIDC\":{\"issuerUrl\":\"${ISSUER_URL}\"}}}"
+              else
+                echo "SKIP: Tenant default-tenant not found (not yet created)"
+              fi
 
-              echo "Patching Certificate maas-default-gateway-tls ..."
-              oc patch certificate maas-default-gateway-tls -n openshift-ingress --type merge -p \
-                "{\"spec\":{\"dnsNames\":[\"*.${DOMAIN}\"]}}"
+              if oc get certificate maas-default-gateway-tls -n openshift-ingress &>/dev/null; then
+                echo "Patching Certificate maas-default-gateway-tls ..."
+                oc patch certificate maas-default-gateway-tls -n openshift-ingress --type merge -p \
+                  "{\"spec\":{\"dnsNames\":[\"*.${DOMAIN}\"]}}"
+              else
+                echo "SKIP: Certificate maas-default-gateway-tls not found (not yet created)"
+              fi
 
               echo "Done. Cluster domain configuration applied."
           resources:

@@ -29,6 +29,10 @@ spec:
       jsonPointers:
         - /metadata/annotations
         - /spec/listeners
+    - group: cert-manager.io
+      kind: Certificate
+      jsonPointers:
+        - /spec/dnsNames
   syncPolicy:
     automated:
       prune: true

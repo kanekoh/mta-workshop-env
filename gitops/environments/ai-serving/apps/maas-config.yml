@@ -17,6 +17,11 @@ spec:
       recurse: true
   destination:
     server: https://kubernetes.default.svc
+  ignoreDifferences:
+    - group: maas.opendatahub.io
+      kind: Tenant
+      jsonPointers:
+        - /spec/externalOIDC/issuerUrl
   syncPolicy:
     automated:
       prune: true
@@ -24,6 +29,7 @@ spec:
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
