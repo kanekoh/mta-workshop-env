@@ -23,6 +23,6 @@ spec:
     name: maas-selfsigned-issuer
     kind: Issuer
   dnsNames:
-    - "*.apps.rosa.hk-ai-srv.frt2.p3.openshiftapps.com"
+    - "*.apps.rosa.hk-ai-srv.hcrr.p3.openshiftapps.com"
   duration: 8760h   # 1 year
   renewBefore: 720h # 30 days
