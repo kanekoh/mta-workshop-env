@@ -1,0 +1,12 @@
+apiVersion: operator.openshift.io/v1
+kind: DNS
+metadata:
+  name: default
+spec:
+  nodePlacement:
+    tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
