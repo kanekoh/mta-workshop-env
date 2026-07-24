@@ -43,6 +43,32 @@ spec:
                 echo "SKIP: Certificate maas-default-gateway-tls not found (not yet created)"
               fi
 
+              # --- Authorino: service-serving CA trust ---
+              if oc get authorino authorino -n kuadrant-system &>/dev/null; then
+                CURRENT_VOLUMES=$(oc get authorino authorino -n kuadrant-system -o jsonpath='{.spec.volumes.items}' 2>/dev/null)
+                if echo "$CURRENT_VOLUMES" | grep -q "openshift-service-ca"; then
+                  echo "SKIP: Authorino CR already has service-ca volume"
+                else
+                  echo "Patching Authorino CR: adding service-ca volume ..."
+                  oc patch authorino authorino -n kuadrant-system --type merge -p \
+                    '{"spec":{"volumes":{"items":[{"name":"service-ca","mountPath":"/etc/ssl/certs/openshift","configMaps":["openshift-service-ca"],"items":[{"key":"service-ca.crt","path":"service-ca.crt"}]}]}}}'
+                fi
+              else
+                echo "SKIP: Authorino CR not found (RHCL not yet ready)"
+              fi
+
+              if oc get deploy authorino -n kuadrant-system &>/dev/null; then
+                CURRENT_ENV=$(oc get deploy authorino -n kuadrant-system -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="SSL_CERT_DIR")].value}' 2>/dev/null)
+                if [ -n "$CURRENT_ENV" ]; then
+                  echo "SKIP: Authorino Deployment already has SSL_CERT_DIR=${CURRENT_ENV}"
+                else
+                  echo "Setting SSL_CERT_DIR on Authorino Deployment ..."
+                  oc set env deploy/authorino -n kuadrant-system SSL_CERT_DIR=/etc/ssl/certs:/etc/ssl/certs/openshift
+                fi
+              else
+                echo "SKIP: Authorino Deployment not found"
+              fi
+
               echo "Done. Cluster domain configuration applied."
           resources:
             requests:

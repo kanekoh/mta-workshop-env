@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openshift-service-ca
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    service.beta.openshift.io/inject-cabundle: "true"
