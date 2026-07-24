@@ -16,11 +16,4 @@ spec:
         proxy:
           kind: HTTPProxy
           spec:
-            url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
-            secret: thanos-querier-global-datasource-secret
-  client:
-    tls:
-      enable: true
-      caCert:
-        type: file
-        certPath: /ca/service-ca.crt
+            url: http://thanos-querier-data-science-thanos-querier.redhat-ods-monitoring.svc.cluster.local:10902
