@@ -17,12 +17,12 @@ spec:
       recurse: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-operators
+    namespace: openshift-cluster-observability-operator
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true

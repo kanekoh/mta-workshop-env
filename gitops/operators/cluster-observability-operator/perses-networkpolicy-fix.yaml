@@ -1,3 +1,6 @@
+# COO を openshift-cluster-observability-operator にインストールすれば
+# 自動生成 NetworkPolicy が正しく機能するためこの workaround は不要。
+# openshift-operators にインストールした場合のフォールバックとして残す。
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -17,6 +20,12 @@ spec:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: openshift-operators
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: perses-operator
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-cluster-observability-operator
       podSelector:
         matchLabels:
           app.kubernetes.io/name: perses-operator
