@@ -69,6 +69,29 @@ spec:
                 echo "SKIP: Authorino Deployment not found"
               fi
 
+              # --- maas-ui: MAAS_API_URL workaround (KCS 7143361) ---
+              if oc get deploy rhods-dashboard -n redhat-ods-applications &>/dev/null; then
+                GW_ADDR=$(oc get gateway maas-default-gateway -n openshift-ingress \
+                  -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
+                if [ -n "$GW_ADDR" ]; then
+                  MAAS_API_URL="https://${GW_ADDR}/maas-api"
+                  CURRENT_URL=$(oc get deploy rhods-dashboard -n redhat-ods-applications \
+                    -o jsonpath='{.spec.template.spec.containers[?(@.name=="maas-ui")].env[?(@.name=="MAAS_API_URL")].value}' 2>/dev/null)
+                  if [ "$CURRENT_URL" = "$MAAS_API_URL" ]; then
+                    echo "SKIP: maas-ui MAAS_API_URL already set to ${MAAS_API_URL}"
+                  else
+                    echo "Setting maas-ui MAAS_API_URL=${MAAS_API_URL} ..."
+                    oc set env deploy/rhods-dashboard -c maas-ui \
+                      MAAS_API_URL="${MAAS_API_URL}" \
+                      -n redhat-ods-applications
+                  fi
+                else
+                  echo "SKIP: Gateway address not yet available"
+                fi
+              else
+                echo "SKIP: rhods-dashboard not found"
+              fi
+
               echo "Done. Cluster domain configuration applied."
           resources:
             requests:
