@@ -11,6 +11,7 @@ resource "rhcs_hcp_machine_pool" "worker_pool" {
 
   cluster  = local.cluster_id
   name     = "extra-workers"
+  version  = var.ocp_version
   replicas = max(2, var.worker_pool_replicas)
   autoscaling = {
     enabled = false
@@ -38,6 +39,7 @@ resource "rhcs_hcp_machine_pool" "additional" {
 
   cluster  = local.cluster_id
   name     = each.value.name
+  version  = var.ocp_version
   replicas = each.value.replicas
 
   # AWS Node Pool configuration
