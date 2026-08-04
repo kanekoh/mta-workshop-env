@@ -9,7 +9,7 @@
     label_selectors:
       - "operators.coreos.com/{{ openshift_gitops.operator_name }}.{{ openshift_gitops.operator_namespace }}"
   register: csv_result
-  until: csv_result.resources | length > 0
+  until: (csv_result.resources | default([])) | length > 0
   retries: 30
   delay: 10
   failed_when: false
@@ -35,12 +35,12 @@
     kind: Namespace
     name: "{{ openshift_gitops.argocd_namespace }}"
   register: argocd_namespace
-  until: argocd_namespace.resources | length > 0
+  until: (argocd_namespace.resources | default([])) | length > 0
   retries: 20
   delay: 10
   failed_when: false
 
 - name: Display ArgoCD namespace status
   debug:
-    msg: "ArgoCD namespace {{ openshift_gitops.argocd_namespace }} {{ 'exists' if argocd_namespace.resources | length > 0 else 'not yet created' }}"
+    msg: "ArgoCD namespace {{ openshift_gitops.argocd_namespace }} {{ 'exists' if (argocd_namespace.resources | default([])) | length > 0 else 'not yet created' }}"
 

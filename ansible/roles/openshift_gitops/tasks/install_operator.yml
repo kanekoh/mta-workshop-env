@@ -22,7 +22,7 @@
         name: "{{ openshift_gitops.operator_namespace }}"
         labels:
           openshift.io/cluster-monitoring: "true"
-  when: operator_subscription.resources | length == 0
+  when: (operator_subscription.resources | default([])) | length == 0
   register: namespace_result
 
 - name: Add cluster-monitoring label to existing Namespace
@@ -36,7 +36,7 @@
         name: "{{ openshift_gitops.operator_namespace }}"
         labels:
           openshift.io/cluster-monitoring: "true"
-  when: operator_subscription.resources | length > 0
+  when: (operator_subscription.resources | default([])) | length > 0
 
 - name: Create OperatorGroup for OpenShift GitOps Operator
   kubernetes.core.k8s:
@@ -48,7 +48,7 @@
     definition:
       spec:
         targetNamespaces: []
-  when: operator_subscription.resources | length == 0
+  when: (operator_subscription.resources | default([])) | length == 0
 
 - name: Create Subscription for OpenShift GitOps Operator
   kubernetes.core.k8s:
@@ -64,7 +64,7 @@
         source: "{{ openshift_gitops.operator_source }}"
         sourceNamespace: openshift-marketplace
         installPlanApproval: Automatic
-  when: operator_subscription.resources | length == 0
+  when: (operator_subscription.resources | default([])) | length == 0
   register: subscription_result
 
 - name: Display subscription creation result
