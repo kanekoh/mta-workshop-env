@@ -31,8 +31,8 @@ variable "tags" {
   description = "Tags to apply to AWS resources"
   type        = map(string)
   default = {
-    Environment = "Workshop"
-    Project     = "MTA-for-Developer-Lightspeed"
+    Environment = "Demo"
+    ManagedBy   = "Terraform"
   }
 }
 

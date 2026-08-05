@@ -351,15 +351,14 @@ deploy_network() {
         return 1
     }
     
-    # terraform.tfvarsが存在しない場合は作成を促す
+    # terraform.tfvarsが存在しない場合は空ファイルを生成（設定は全て env.sh / TF_VAR_* で供給される）
     if [ ! -f "terraform.tfvars" ]; then
-        log_warning "terraform.tfvarsが存在しません"
-        log_info "terraform.tfvars.exampleからコピーして設定してください"
-        cp terraform.tfvars.example terraform.tfvars
-        log_error "terraform.tfvarsを編集してから再度実行してください"
-        popd > /dev/null  # terraform/networkから戻る
-        popd > /dev/null  # SCRIPT_DIRから戻る
-        exit 1
+        log_info "terraform.tfvars を初期生成しました（設定は env.sh + profile で管理）"
+        cat > terraform.tfvars << 'TFVARS'
+# 設定は env.sh および profiles/*.env の TF_VAR_* 環境変数で管理されます。
+# 環境変数で設定困難な複雑な構造（マップ等）のみここに記載してください。
+# 詳細: terraform.tfvars.example を参照
+TFVARS
     fi
     
     # Terraform初期化
@@ -507,10 +506,14 @@ PYTHON_SCRIPT
         return 1
     }
     
-    # terraform.tfvarsが存在しない場合は作成
+    # terraform.tfvarsが存在しない場合は空ファイルを生成（設定は全て env.sh / TF_VAR_* で供給される）
     if [ ! -f "terraform.tfvars" ]; then
-        log_info "terraform.tfvarsを作成中..."
-        cp terraform.tfvars.example terraform.tfvars
+        log_info "terraform.tfvars を初期生成しました（設定は env.sh + profile で管理）"
+        cat > terraform.tfvars << 'TFVARS'
+# 設定は env.sh および profiles/*.env の TF_VAR_* 環境変数で管理されます。
+# 環境変数で設定困難な複雑な構造（additional_machine_pools 等）のみここに記載してください。
+# 詳細: terraform.tfvars.example を参照
+TFVARS
     fi
     
     # ネットワーク情報をnetwork-outputs.auto.tfvarsに設定/更新
@@ -761,7 +764,7 @@ deploy_cluster_rosa_cli() {
     # クラスター設定（環境変数優先）
     local cluster_name="${TF_VAR_cluster_name:-rosa-demo}"
     local region="${TF_VAR_aws_region:-${AWS_DEFAULT_REGION:-ap-northeast-1}}"
-    local ocp_version="${TF_VAR_ocp_version:-4.19}"
+    local ocp_version="${TF_VAR_ocp_version:-4.22}"
     local machine_type="${TF_VAR_rosa_machine_type:-m6a.2xlarge}"
     local replicas="${TF_VAR_rosa_replicas:-2}"
     local billing_account="${TF_VAR_billing_account:-}"

@@ -22,21 +22,14 @@ variable "vpc_cidr" {
 }
 
 variable "ocp_version" {
-  description = "OpenShift version to deploy"
+  description = "OpenShift version to deploy (e.g. '4.22.5'). Set via TF_VAR_ocp_version in env.sh or profile."
   type        = string
-  default     = "4.19"
 }
 
 variable "rosa_machine_type" {
   description = "Instance type for ROSA compute nodes"
   type        = string
   default     = "m6a.2xlarge"
-}
-
-variable "rosa_replicas" {
-  description = "[Deprecated] Initial Worker Pool is fixed (Single=2, Multi=3). Use worker_pool_replicas for scaling. Kept for backward compatibility only."
-  type        = number
-  default     = 2
 }
 
 variable "worker_pool_replicas" {

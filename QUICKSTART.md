@@ -263,9 +263,9 @@ terraform destroy
 ### コスト削減
 
 ```bash
-# env.sh でノード数を最小化
-export TF_VAR_rosa_replicas="2"
+# env.sh でインスタンスを最小化
 export TF_VAR_rosa_machine_type="m6a.xlarge"  # より小さいインスタンス
+export TF_VAR_worker_pool_replicas="0"        # 追加プールなし（初期2台のみ）
 ```
 
 ### デバッグモード

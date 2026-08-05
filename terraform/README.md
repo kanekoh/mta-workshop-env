@@ -1,214 +1,122 @@
-# Terraform Configuration for ROSA
+# Terraform Configuration for ROSA HCP
 
-このディレクトリには、Red Hat OpenShift for AWS (ROSA) HCPクラスターを構築するためのTerraform設定が含まれています。
+ROSA HCP クラスターを構築するための Terraform 設定。
+ネットワーク（VPC）とクラスターの 2 つのルートモジュールで構成される。
 
-## 環境変数による設定管理
-
-このプロジェクトでは、機密情報を含むすべての主要な設定を環境変数で管理します。
-
-### TF_VAR_* 環境変数
-
-Terraformは `TF_VAR_` プレフィックスを持つ環境変数を自動的に認識します：
-
-```bash
-# env.sh で設定
-export TF_VAR_aws_region="ap-northeast-1"
-export TF_VAR_cluster_name="mta-lightspeed"
-export TF_VAR_ocp_version="4.19"
-export TF_VAR_billing_account="123456789012"  # 機密情報
-
-# Terraform実行時に自動的に変数として認識される
-terraform plan
-# → var.aws_region = "ap-northeast-1"
-# → var.cluster_name = "mta-lightspeed"
-# などと同等
-```
-
-### 管理される変数
-
-以下の変数は `env.sh` で環境変数として設定されます：
-
-| 環境変数 | Terraform変数 | 説明 | 機密性 |
-|---------|--------------|------|-------|
-| `TF_VAR_aws_region` | `var.aws_region` | AWSリージョン | 低 |
-| `TF_VAR_cluster_name` | `var.cluster_name` | クラスター名 | 低 |
-| `TF_VAR_ocp_version` | `var.ocp_version` | OpenShiftバージョン | 低 |
-| `TF_VAR_billing_account` | `var.billing_account` | AWS Billing Account ID | **高** |
-| `TF_VAR_rosa_machine_type` | `var.rosa_machine_type` | EC2インスタンスタイプ | 低 |
-| `TF_VAR_rosa_replicas` | `var.rosa_replicas` | ノード数 | 低 |
-| `TF_VAR_vpc_cidr` | `var.vpc_cidr` | VPC CIDR | 低 |
-| `TF_VAR_availability_zone_count` | `var.availability_zone_count` | AZ数 | 低 |
-
-### AWS認証情報
-
-AWS SDKの標準環境変数を使用：
-
-```bash
-export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
-export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-export AWS_DEFAULT_REGION="ap-northeast-1"
-```
-
-## 使用方法
-
-### 基本フロー
-
-```bash
-# 1. 環境変数を読み込む
-cd /path/to/project
-source env.sh
-
-# 2. Terraformディレクトリに移動
-cd terraform
-
-# 3. 初期化
-terraform init
-
-# 4. 実行計画
-terraform plan
-
-# 5. 適用
-terraform apply
-
-# 6. 出力確認
-terraform output cluster_console_url
-terraform output -json ansible_inventory_json
-```
-
-### terraform.tfvars の使用（オプション）
-
-`terraform.tfvars` は主に以下の2つの目的で使用されます：
-
-#### 1. 複雑な構造の設定
-
-環境変数では設定が困難な複雑な構造（リスト、オブジェクト、ネスト構造）を設定する場合：
-
-```bash
-cp terraform/cluster/terraform.tfvars.example terraform/cluster/terraform.tfvars
-vim terraform/cluster/terraform.tfvars
-```
-
-**主な用途**:
-- `additional_machine_pools`: GPU プールなどの追加 MachinePool を定義
-- `tags`: 複雑なマップ構造（環境変数でも JSON 形式で設定可能）
-
-#### 2. ネットワークモジュールの出力（自動設定）
-
-`deploy.sh` が自動的にネットワークモジュールの出力を `terraform.tfvars` に設定します。
-手動で設定する必要はありません。
-
-**自動設定される変数**:
-- `vpc_id`
-- `public_subnet_ids`
-- `private_subnet_ids`
-- `availability_zones`
-
-### シンプルな変数の設定方法
-
-文字列や数値などのシンプルな変数は、**環境変数（`env.sh`）で設定してください**。
-`terraform.tfvars` に設定する必要はありません。
-
-**変数の優先順位**:
-1. `terraform.tfvars` で指定した値（最優先）
-2. `TF_VAR_*` 環境変数（`env.sh` で設定）
-3. `variables.tf` のデフォルト値（最低優先度）
-
-**推奨される使い分け**:
-- **`env.sh`**: シンプルな変数（文字列、数値、真偽値）や機密情報
-- **`terraform.tfvars`**: 複雑な構造（`additional_machine_pools` など）や、`deploy.sh` が自動設定するネットワーク情報
-- **デフォルト値**: 標準的な設定で問題ない場合
-
-**例: `env.sh` で設定（推奨）**
-
-```bash
-# env.sh に追加
-export TF_VAR_aws_region="us-east-1"
-export TF_VAR_cluster_name="my-custom-cluster"
-export TF_VAR_ocp_version="4.20"
-export TF_VAR_rosa_machine_type="m6a.4xlarge"
-export TF_VAR_rosa_replicas="3"
-export TF_VAR_vpc_cidr="192.168.0.0/16"
-export TF_VAR_availability_zone_count="3"
-export TF_VAR_create_admin_user="false"
-```
-
-**例: `terraform.tfvars` で設定（複雑な構造の場合）**
-
-```hcl
-# terraform/cluster/terraform.tfvars
-additional_machine_pools = [
-  {
-    name          = "gpu-pool"
-    instance_type = "g6e.12xlarge"
-    replicas      = 1
-    labels = {
-      "node-role.kubernetes.io/gpu" = ""
-      "workload-type"               = "ai"
-    }
-    taints = []
-  }
-]
-```
-
-## セキュリティのベストプラクティス
-
-### ✅ 推奨
-
-- ✅ `env.sh` で機密情報を管理
-- ✅ `env.sh` を `.gitignore` に追加
-- ✅ 環境変数（`TF_VAR_*`）を使用
-- ✅ AWS認証情報は標準環境変数を使用
-
-### ❌ 非推奨
-
-- ❌ `terraform.tfvars` に機密情報を記載
-- ❌ ソースコードに認証情報をハードコード
-- ❌ Gitに機密情報をコミット
-
-## ファイル構成
+## ディレクトリ構成
 
 ```
 terraform/
-├── versions.tf              # プロバイダー設定
-├── variables.tf             # 変数定義
-├── network.tf               # VPC/ネットワーク
-├── main.tf                  # ROSAクラスター
-├── outputs.tf               # 出力定義
-├── terraform.tfvars.example # 設定サンプル
-└── README.md               # このファイル
+├── network/                      # VPC / サブネット / NAT
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── versions.tf
+│   └── terraform.tfvars.example
+└── cluster/                      # ROSA HCP クラスター + IDP + MachinePool
+    ├── main.tf                   # rosa-hcp モジュール + HTPasswd IDP
+    ├── machinepools.tf           # 追加 MachinePool（extra-workers, GPU 等）
+    ├── locals.tf                 # レプリカ数計算、ユーザー名生成、IAM ARN
+    ├── variables.tf
+    ├── outputs.tf
+    ├── versions.tf
+    └── terraform.tfvars.example
 ```
 
-## トラブルシューティング
+## 設定の階層
 
-### 環境変数が認識されない
+```
+env.sh          シークレット + AWS アカウント共通設定
+  ↓ 上書き
+profiles/*.env  クラスター構成（サイズ、バージョン、GPU、GitOps 環境）
+  ↓ 上書き
+deploy.sh       CLI フラグ + auto.tfvars 自動生成
+  ↓
+terraform apply
+```
+
+### 変数の優先順位
+
+1. `terraform.tfvars` / `*.auto.tfvars`（最優先）
+2. `TF_VAR_*` 環境変数（`env.sh` + `profiles/*.env`）
+3. `variables.tf` のデフォルト値
+
+## 使用方法
+
+通常は `deploy.sh` 経由で実行する:
 
 ```bash
-# 環境変数の確認
-env | grep TF_VAR_
-
-# 再読み込み
-source ../env.sh
+source env.sh
+export PROFILE=ai-serving    # profiles/ai-serving.env
+./deploy.sh
 ```
 
-### 変数の優先順位を確認
+`deploy.sh` が以下を自動処理する:
+
+1. `terraform/network` を apply → VPC / サブネット作成
+2. network の出力を `cluster/network-outputs.auto.tfvars` に書き出し
+3. プロファイルの GPU/ODF 設定を `cluster/additional-pools.auto.tfvars` に書き出し
+4. `terraform/cluster` を apply → ROSA HCP 作成
+5. クラスター情報を `ansible/cluster_info.json` に出力
+
+### 手動実行
 
 ```bash
-# Terraform Consoleで確認
-terraform console
-> var.cluster_name
-> var.ocp_version
+source env.sh
+
+cd terraform/network
+terraform init && terraform apply
+
+cd ../cluster
+terraform init && terraform apply
 ```
 
-### デバッグモード
+手動実行時は `network-outputs.auto.tfvars` を自分で作成する必要がある。
 
-```bash
-export TF_LOG=DEBUG
-terraform plan
-```
+## 主要な変数
 
-## 参考リンク
+### env.sh で設定（シークレット・共通）
 
-- [Terraform Environment Variables](https://www.terraform.io/language/values/variables#environment-variables)
-- [ROSA Documentation](https://docs.openshift.com/rosa/)
-- [Terraform RHCS Provider](https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs)
+| 環境変数 | 説明 |
+|---------|------|
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | AWS 認証 |
+| `RHCS_CLIENT_ID` / `RHCS_CLIENT_SECRET` | RHCS プロバイダ認証 |
+| `TF_VAR_aws_region` | AWS リージョン |
+| `TF_VAR_vpc_cidr` | VPC CIDR |
+| `TF_VAR_billing_account` | AWS Billing Account ID |
+| `TF_VAR_ocp_version` | OpenShift バージョン（デフォルト値なし・必須） |
+| `TF_VAR_admin_password` / `TF_VAR_cluster_admin_password` | パスワード |
 
+### profiles/*.env で設定（クラスター構成）
+
+| 変数 | 説明 |
+|------|------|
+| `TF_VAR_cluster_name` | クラスター名（CLUSTER_NAME_PREFIX が前置される） |
+| `TF_VAR_ocp_version` | OpenShift バージョン（env.sh を上書き） |
+| `TF_VAR_rosa_machine_type` | ワーカーのインスタンスタイプ |
+| `TF_VAR_worker_pool_replicas` | 追加 Worker 数（0=初期プールのみ） |
+| `TF_VAR_availability_zone_count` | AZ 数（1 or 3） |
+| `GPU_MACHINE_TYPE` / `GPU_REPLICAS` | GPU ノード設定（deploy.sh が auto.tfvars に変換） |
+
+## MachinePool 戦略
+
+| プール | 管理元 | 備考 |
+|--------|--------|------|
+| 1st（初期） | `rosa-hcp` モジュール | Single-AZ=2, Multi-AZ=3。作成後変更不可 |
+| 2nd `extra-workers` | `machinepools.tf` | `worker_pool_replicas > 0` で作成 |
+| 3rd+ `additional` | `machinepools.tf` | GPU/ODF 等。deploy.sh が auto.tfvars を生成 |
+
+## 使用モジュール・プロバイダ
+
+| コンポーネント | ソース | バージョン |
+|---------------|--------|-----------|
+| rosa-hcp モジュール | `terraform-redhat/rosa-hcp/rhcs` | `~> 1.7.4` |
+| RHCS プロバイダ | `terraform-redhat/rhcs` | `>= 1.7.7` |
+| AWS プロバイダ | `hashicorp/aws` | `>= 6.51.0` |
+
+## セキュリティ
+
+- `env.sh` は `.gitignore` に登録済み。Git にコミットしない
+- `terraform.tfvars` も `.gitignore` 対象
+- `*.auto.tfvars` は `deploy.sh` が生成。機密情報は含まない
+- Gitleaks のカスタムルールで Terraform 変数内のシークレットを検出する設定済み

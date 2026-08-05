@@ -4,7 +4,7 @@ data "aws_caller_identity" "current" {}
 # ROSA HCP モジュール
 module "rosa_hcp" {
   source  = "terraform-redhat/rosa-hcp/rhcs"
-  version = "~> 1.7"
+  version = "~> 1.7.4"
 
   # --- 必須パラメータ ---
   cluster_name      = var.cluster_name
