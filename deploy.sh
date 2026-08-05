@@ -228,9 +228,12 @@ reconcile_argocd_path() {
     if ! command -v oc &>/dev/null; then
         return 0
     fi
+    if ! oc whoami --request-timeout=5s &>/dev/null; then
+        return 0
+    fi
 
     local current_path
-    current_path=$(oc get applications.argoproj.io gitops-app-of-apps -n openshift-gitops -o jsonpath='{.spec.source.path}' 2>/dev/null) || return 0
+    current_path=$(oc get applications.argoproj.io gitops-app-of-apps -n openshift-gitops -o jsonpath='{.spec.source.path}' --request-timeout=10s 2>/dev/null) || return 0
 
     if [ -z "$current_path" ]; then
         return 0
