@@ -17,6 +17,6 @@ spec:
     secret:
       name: loki-s3-credentials
       type: s3
-    storageClassName: gp3-csi
+  storageClassName: gp3-csi
   tenants:
     mode: openshift-logging
