@@ -1,10 +1,10 @@
-# LokiStack for Network Observability (dedicated instance, separate from cluster logging)
-# Secret loki-s3-credentials must exist in netobserv (created by Ansible setup_loki_storage.yml)
+# LokiStack for Cluster Logging
+# Secret loki-s3-credentials must exist in openshift-logging
 apiVersion: loki.grafana.com/v1
 kind: LokiStack
 metadata:
-  name: netobserv
-  namespace: netobserv
+  name: logging-loki
+  namespace: openshift-logging
   annotations:
     argocd.argoproj.io/sync-wave: "3"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
@@ -17,6 +17,6 @@ spec:
     secret:
       name: loki-s3-credentials
       type: s3
-  storageClassName: gp3-csi
+    storageClassName: gp3-csi
   tenants:
-    mode: openshift-network
+    mode: openshift-logging
