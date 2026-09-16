@@ -1,0 +1,13 @@
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  version: v1.27-latest
+  namespace: istio-system
+  profile: openshift
+  updateStrategy:
+    type: InPlace
