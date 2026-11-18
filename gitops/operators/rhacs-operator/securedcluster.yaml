@@ -7,12 +7,15 @@ metadata:
     argocd.argoproj.io/sync-wave: "4"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-  clusterName: hk-bare
-  centralEndpoint: "central-rhacs-operator.apps.rosa.hk-bare.x388.p3.openshiftapps.com:443"
+  # Same-cluster Central + Sensor on hk-platform-ops
+  clusterName: hk-platform-ops
+  centralEndpoint: "central.rhacs-operator.svc:443"
   admissionControl:
     listenOnCreates: true
     listenOnUpdates: true
     listenOnEvents: true
+    enforcement: Enabled
+    failurePolicy: Ignore
   perNode:
     collector:
       collection: EBPF
